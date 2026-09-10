@@ -49,6 +49,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  FileDown,
   GraduationCap,
   Lock,
   LogOut,
@@ -86,6 +87,8 @@ import {
   type Ders,
 } from "@/lib/talebeler";
 import { dosyaFotoDataUrl, bashHarfler } from "@/lib/foto";
+import { aidatTutariniOku } from "@/lib/talebeler";
+import { listeYazdir } from "@/lib/pdf";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/")({
@@ -604,6 +607,75 @@ function Index() {
     setParolaDegistirHata(null);
   };
 
+  const hafizlikPdf = () => {
+    const gunler = tr("haftaGun").slice(0, 5);
+    listeYazdir({
+      altBaslik: "Hafızlık Takip Listesi",
+      bilgi: [`Hafta: ${haftaEtiket(seciliHafta)}`, `Hocaefendi: ${hoca}`],
+      sutunlar: [
+        { baslik: "#", genislik: "6%", hiza: "center" },
+        { baslik: "Talebe", genislik: "34%" },
+        ...gunler.map((g) => ({
+          baslik: g.slice(0, 3),
+          genislik: "8%",
+          hiza: "center" as const,
+        })),
+        { baslik: "Sayfa", genislik: "10%", hiza: "center" },
+        { baslik: "Cüz", genislik: "10%", hiza: "center" },
+      ],
+      satirlar: hafizTalebeler.map((t, i) => {
+        const verilen = getDersGunler(t, seciliDers, seciliHafta);
+        return [
+          i + 1,
+          t.isim,
+          ...gunler.map((_, gi) => (verilen.includes(gi) ? "✓" : "–")),
+          t.sayfa,
+          cuzHesapla(t.sayfa),
+        ];
+      }),
+    });
+  };
+
+  const aidatPdf = async () => {
+    const tutar = await aidatTutariniOku();
+    const simdi = new Date();
+    const ayKey = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}`;
+    const ayAdi = simdi.toLocaleDateString("tr-TR", {
+      month: "long",
+      year: "numeric",
+    });
+    const liste =
+      grupFiltre === "hepsi"
+        ? aidatTalebeler
+        : aidatTalebeler.filter((t) => t.grup === grupFiltre);
+    const odeyen = liste.filter((t) => t.aidat?.[ayKey]).length;
+    const grupAdi =
+      grupFiltre === "hepsi"
+        ? "Tüm gruplar"
+        : (GRUPLAR.find((g) => g.id === grupFiltre)?.ad ?? "Grup");
+    listeYazdir({
+      altBaslik: `Aidat Takip Listesi · ${ayAdi}`,
+      bilgi: [
+        `Grup: ${grupAdi}`,
+        `Aylık aidat: ${tutar.toLocaleString("tr-TR")} Birr`,
+        `Ödeyen: ${odeyen}/${liste.length}`,
+        `Toplanan: ${(odeyen * tutar).toLocaleString("tr-TR")} Birr`,
+      ],
+      sutunlar: [
+        { baslik: "#", genislik: "8%", hiza: "center" },
+        { baslik: "Talebe", genislik: "46%" },
+        { baslik: "Tutar", genislik: "23%", hiza: "center" },
+        { baslik: "Durum", genislik: "23%", hiza: "center" },
+      ],
+      satirlar: liste.map((t, i) => [
+        i + 1,
+        t.isim,
+        `${tutar.toLocaleString("tr-TR")} Birr`,
+        t.aidat?.[ayKey] ? "Ödedi" : "Ödemedi",
+      ]),
+    });
+  };
+
   return (
     <DilContext.Provider value={dil}>
     <div className="min-h-screen bg-background">
@@ -1070,6 +1142,32 @@ function Index() {
             >
               <Lock className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">{tr("parolaDegistir")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+              onClick={() => {
+                setAyarlarAcik(false);
+                setTimeout(() => hafizlikPdf(), 150);
+              }}
+            >
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Hafızlık Listesini PDF İndir
+              </span>
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+              onClick={() => {
+                setAyarlarAcik(false);
+                setTimeout(() => void aidatPdf(), 150);
+              }}
+            >
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Aidat Listesini PDF İndir
+              </span>
             </button>
             {hocaModu && (
               <>
