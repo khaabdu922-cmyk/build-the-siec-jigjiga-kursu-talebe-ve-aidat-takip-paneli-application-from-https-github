@@ -86,6 +86,8 @@ import {
   type Ders,
 } from "@/lib/talebeler";
 import { dosyaFotoDataUrl, bashHarfler } from "@/lib/foto";
+import { aidatTutariniOku } from "@/lib/talebeler";
+import { listeYazdir } from "@/lib/pdf";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/")({
