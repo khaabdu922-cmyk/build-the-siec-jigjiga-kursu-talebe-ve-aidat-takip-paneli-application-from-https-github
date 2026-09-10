@@ -871,8 +871,8 @@ function Index() {
                       </SelectContent>
                     </Select>
                   </TableHead>
-                  <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">{tr("sf")}</TableHead>
-                  <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">{tr("cuz")}</TableHead>
+                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("sf")}</TableHead>
+                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("cuz")}</TableHead>
                   {hocaModu && (
                     <TableHead className="px-0.5 text-right text-[10px] sm:px-4 sm:text-sm">{tr("islem")}</TableHead>
                   )}
