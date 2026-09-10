@@ -7,11 +7,16 @@ export type PdfSutun = {
   hiza?: "left" | "center" | "right";
 };
 
+export type PdfSatir = {
+  hucreler: (string | number)[];
+  className?: string;
+};
+
 export type PdfTablo = {
   altBaslik: string;
   bilgi?: string[];
   sutunlar: PdfSutun[];
-  satirlar: (string | number)[][];
+  satirlar: (PdfSatir | (string | number)[])[];
   dosyaAdi?: string;
 };
 
