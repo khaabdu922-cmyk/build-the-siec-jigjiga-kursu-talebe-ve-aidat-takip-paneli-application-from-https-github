@@ -778,7 +778,11 @@ function Index() {
               {tr("baslik")}
             </h1>
             <p className="mt-2 text-base text-muted-foreground sm:text-xl">
-              {sekme === "aidat" ? tr("altBaslikAidat") : tr("altBaslikHafizlik")}
+              {aidatListeAcik
+                ? "Aidat Talebe Listesi"
+                : sekme === "aidat"
+                  ? tr("altBaslikAidat")
+                  : tr("altBaslikHafizlik")}
             </p>
           </div>
         </header>
