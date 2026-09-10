@@ -841,11 +841,11 @@ function Index() {
             <Table className="table-fixed">
               <colgroup>
                 <col className="w-[6%]" />
-                <col className={hocaModu ? "w-[42%]" : "w-[46%]"} />
-                <col className={hocaModu ? "w-[18%]" : "w-[20%]"} />
-                <col className="w-[8%]" />
-                <col className="w-[8%]" />
-                {hocaModu && <col className="w-[8%]" />}
+                <col className={hocaModu ? "w-[44%]" : "w-[50%]"} />
+                <col className={hocaModu ? "w-[20%]" : "w-[22%]"} />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                {hocaModu && <col className="w-[10%]" />}
               </colgroup>
               <TableHeader>
                 <TableRow className="bg-muted/40">
