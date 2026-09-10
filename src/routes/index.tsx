@@ -871,8 +871,8 @@ function Index() {
                       </SelectContent>
                     </Select>
                   </TableHead>
-                  <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">{tr("sf")}</TableHead>
-                  <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">{tr("cuz")}</TableHead>
+                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("sf")}</TableHead>
+                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("cuz")}</TableHead>
                   {hocaModu && (
                     <TableHead className="px-0.5 text-right text-[10px] sm:px-4 sm:text-sm">{tr("islem")}</TableHead>
                   )}
@@ -908,14 +908,14 @@ function Index() {
                         onToggle={() => dersGunToggle(t, seciliDers, seciliGun)}
                       />
                     </TableCell>
-                    <TableCell className="px-0.5 py-2 text-center text-[10px] tabular-nums sm:px-4 sm:py-3 sm:text-sm">
+                    <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums sm:px-4 sm:py-3 sm:text-base">
                       <SayfaEditor
                         talebe={t}
                         duzenlenebilir={false}
                         onKaydet={(yeni) => guncelle(t.id, { sayfa: yeni })}
                       />
                     </TableCell>
-                    <TableCell className="px-0.5 py-2 text-center text-[10px] tabular-nums text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                    <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums text-foreground sm:px-4 sm:py-3 sm:text-base">
                       {cuzHesapla(t.sayfa)}
                     </TableCell>
                     {hocaModu && (
