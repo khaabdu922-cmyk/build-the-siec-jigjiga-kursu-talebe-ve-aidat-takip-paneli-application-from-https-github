@@ -296,8 +296,8 @@ export default function AidatPanel({
                         onClick={() => onTalebe?.(t)}
                         className="group flex w-full min-w-0 items-center gap-1.5 text-left text-xs hover:text-primary sm:gap-3 sm:text-sm"
                       >
-                        <span className="shrink-0 scale-75 sm:scale-100">
-                          <TalebeAvatar talebe={t} boyut={32} />
+                        <span className="shrink-0 scale-90 sm:scale-100">
+                          <TalebeAvatar talebe={t} boyut={36} />
                         </span>
                         <span className="min-w-0 truncate group-hover:underline">
                           {t.isim}
