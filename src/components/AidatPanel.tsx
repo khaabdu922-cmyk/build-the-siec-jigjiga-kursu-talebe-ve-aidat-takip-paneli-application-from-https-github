@@ -261,12 +261,12 @@ export default function AidatPanel({
 
       <Card className="overflow-hidden">
           <Table className="table-fixed">
-            <colgroup>
-              <col className="w-[8%]" />
-              <col className="w-[42%]" />
-              <col className="w-[15%]" />
-              <col className="w-[30%]" />
-            </colgroup>
+          <colgroup>
+            <col className="w-[6%]" />
+            <col className="w-[44%]" />
+            <col className="w-[15%]" />
+            <col className="w-[35%]" />
+          </colgroup>
             <TableHeader>
               <TableRow className="bg-muted/40">
                 <TableHead className="w-8 px-1 text-center text-xs sm:w-12 sm:px-4">
