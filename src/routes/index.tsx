@@ -91,6 +91,24 @@ import { Textarea } from "@/components/ui/textarea";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
+      { title: "SİEC JİGJİGA KURSU — Talebe ve Aidat Takip Paneli" },
+      {
+        name: "description",
+        content:
+          "Talebe hafızlık ilerlemesi, günlük ders takibi ve aylık aidat kayıtları tek panelde.",
+      },
+      { property: "og:title", content: "SİEC JİGJİGA KURSU — Talebe ve Aidat Takip Paneli" },
+      {
+        property: "og:description",
+        content:
+          "Talebe hafızlık ilerlemesi, günlük ders takibi ve aylık aidat kayıtları tek panelde.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  head: () => ({
+    meta: [
       { title: "Talebe Takip — Hocaefendi Paneli" },
       {
         name: "description",
