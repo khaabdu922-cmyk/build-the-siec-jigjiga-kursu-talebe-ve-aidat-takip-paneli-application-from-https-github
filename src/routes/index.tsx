@@ -107,16 +107,6 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  head: () => ({
-    meta: [
-      { title: "Talebe Takip — Hocaefendi Paneli" },
-      {
-        name: "description",
-        content:
-          "Talebelerin kıraat ve Kur'an-ı Kerim ilerlemesini takip edin.",
-      },
-    ],
-  }),
   component: Index,
 });
 
