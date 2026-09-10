@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -273,12 +274,7 @@ function useT() {
 function mevcutParola(): string {
   try {
     const kayitli = localStorage.getItem(HOCA_PAROLA_KEY);
-    // Eski parolayı temizle, herkes yeni varsayılan ile girebilsin
-    if (kayitli && kayitli !== VARSAYILAN_PAROLA) {
-      localStorage.removeItem(HOCA_PAROLA_KEY);
-      return VARSAYILAN_PAROLA;
-    }
-    return kayitli || VARSAYILAN_PAROLA;
+    return kayitli && kayitli.length > 0 ? kayitli : VARSAYILAN_PAROLA;
   } catch {
     return VARSAYILAN_PAROLA;
   }
@@ -599,7 +595,11 @@ function Index() {
     }
     try {
       localStorage.setItem(HOCA_PAROLA_KEY, yeniParola);
-    } catch {}
+    } catch {
+      setParolaDegistirHata("Parola kaydedilemedi.");
+      return;
+    }
+    toast.success("Parola başarıyla değiştirildi");
     setParolaDegistirAcik(false);
     setEskiParola("");
     setYeniParola("");
