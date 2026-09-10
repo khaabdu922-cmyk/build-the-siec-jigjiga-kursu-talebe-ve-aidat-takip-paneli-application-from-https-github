@@ -667,12 +667,16 @@ function Index() {
         { baslik: "Tutar", genislik: "23%", hiza: "center" },
         { baslik: "Durum", genislik: "23%", hiza: "center" },
       ],
-      satirlar: liste.map((t, i) => [
-        i + 1,
-        t.isim,
-        `${tutar.toLocaleString("tr-TR")} Birr`,
-        t.aidat?.[ayKey] ? "Ödedi" : "Ödemedi",
-      ]),
+      satirlar: liste.map((t, i) => {
+        const odendi = !!t.aidat?.[ayKey];
+        const satir = [
+          i + 1,
+          t.isim,
+          `${tutar.toLocaleString("tr-TR")} Birr`,
+          odendi ? "Ödedi" : "Ödemedi",
+        ];
+        return odendi ? satir : { hucreler: satir, className: "kirmizi" };
+      }),
     });
   };
 
