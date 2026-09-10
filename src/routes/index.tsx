@@ -865,7 +865,73 @@ function Index() {
         </Card>
 
         {sekme === "aidat" ? (
-          <>
+          aidatListeAcik ? (
+            <Card className="overflow-hidden">
+              <Table className="table-fixed">
+                <colgroup>
+                  <col className="w-[10%]" />
+                  <col className="w-[55%]" />
+                  <col className="w-[35%]" />
+                </colgroup>
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="px-2 text-center text-xs sm:px-4 sm:text-sm">
+                      #
+                    </TableHead>
+                    <TableHead className="px-2 text-xs sm:px-4 sm:text-sm">
+                      Talebe
+                    </TableHead>
+                    <TableHead className="px-2 text-xs sm:px-4 sm:text-sm">
+                      Grup
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aidatTalebeler.map((t, i) => (
+                    <TableRow key={t.id} className="hover:bg-muted/30">
+                      <TableCell className="px-2 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                        {i + 1}
+                      </TableCell>
+                      <TableCell className="min-w-0 px-2 py-2 font-medium sm:px-4 sm:py-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfilAidattan(true);
+                            setProfilGoster(t);
+                          }}
+                          className="group flex w-full min-w-0 items-center gap-2 text-left text-xs hover:text-primary sm:gap-3 sm:text-sm"
+                        >
+                          <span className="shrink-0">
+                            <TalebeAvatar talebe={t} boyut={36} />
+                          </span>
+                          <span className="min-w-0 truncate group-hover:underline">
+                            {t.isim}
+                          </span>
+                        </button>
+                      </TableCell>
+                      <TableCell className="min-w-0 px-2 py-2 text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                        <span className="block truncate">
+                          {t.grup
+                            ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—")
+                            : "—"}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {aidatTalebeler.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="py-10 text-center text-sm text-muted-foreground"
+                      >
+                        Henüz aidat kaydı olan talebe yok.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          ) : (
             <AidatPanel
               talebeler={aidatTalebeler}
               hocaModu={hocaModu}
@@ -875,7 +941,7 @@ function Index() {
               }}
               grupFiltre={grupFiltre}
             />
-          </>
+          )
         ) : (
 
         <>
