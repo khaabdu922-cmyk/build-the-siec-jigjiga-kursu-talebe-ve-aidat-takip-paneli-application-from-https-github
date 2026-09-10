@@ -66,6 +66,8 @@ export function listeYazdir({
   }
   tbody td { border: 1px solid #dfe7e2; padding: 5px 6px; }
   tbody tr:nth-child(even) td { background: #f8fbf9; }
+  tbody tr.kirmizi td { background: #fff0f0; color: #b91c1c; font-weight: 600; }
+  tbody tr.kirmizi td:first-child { border-left: 3px solid #dc2626; }
   tfoot td { font-size: 10px; color: #6b7770; border: none; padding-top: 10px; }
   thead { display: table-header-group; }
   tr { page-break-inside: avoid; }
