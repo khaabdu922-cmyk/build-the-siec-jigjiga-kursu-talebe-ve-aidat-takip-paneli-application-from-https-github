@@ -94,15 +94,16 @@ export function listeYazdir({
     </thead>
     <tbody>
       ${satirlar
-        .map(
-          (r) =>
-            `<tr>${r
-              .map(
-                (c, i) =>
-                  `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`,
-              )
-              .join("")}</tr>`,
-        )
+        .map((r) => {
+          const hucreler = Array.isArray(r) ? r : r.hucreler;
+          const cls = !Array.isArray(r) && r.className ? ` ${r.className}` : "";
+          return `<tr class="${cls.trim()}">${hucreler
+            .map(
+              (c, i) =>
+                `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`,
+            )
+            .join("")}</tr>`;
+        })
         .join("")}
     </tbody>
     <tfoot>
