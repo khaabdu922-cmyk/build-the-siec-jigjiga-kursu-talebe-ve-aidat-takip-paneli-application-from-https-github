@@ -737,10 +737,11 @@ function Index() {
                     key={k}
                     onSelect={() => {
                       setSekme("aidat");
+                      setAidatListeAcik(false);
                       setGrupFiltre(k as Grup | "hepsi");
                     }}
                     className={
-                      sekme === "aidat" && grupFiltre === k
+                      !aidatListeAcik && sekme === "aidat" && grupFiltre === k
                         ? "font-semibold text-primary"
                         : ""
                     }
