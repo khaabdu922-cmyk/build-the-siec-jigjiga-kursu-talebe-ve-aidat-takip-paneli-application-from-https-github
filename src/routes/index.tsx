@@ -403,6 +403,7 @@ function Index() {
 
   const [sekme, setSekme] = useState<"hafizlik" | "aidat">("hafizlik");
   const [grupFiltre, setGrupFiltre] = useState<Grup | "hepsi">("hepsi");
+  const [aidatListeAcik, setAidatListeAcik] = useState(false);
 
   const [vermediAcik, setVermediAcik] = useState(false);
 
@@ -708,13 +709,23 @@ function Index() {
                     key={k}
                     onSelect={() => {
                       setSekme(k);
+                      setAidatListeAcik(false);
                       if (k === "aidat") setGrupFiltre("hepsi");
                     }}
-                    className={sekme === k ? "font-semibold text-primary" : ""}
+                    className={!aidatListeAcik && sekme === k ? "font-semibold text-primary" : ""}
                   >
                     {etiket}
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setSekme("aidat");
+                    setAidatListeAcik(true);
+                  }}
+                  className={aidatListeAcik ? "font-semibold text-primary" : ""}
+                >
+                  Aidat Talebe Listesi
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Gruplar</DropdownMenuLabel>
                 {([
