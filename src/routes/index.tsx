@@ -594,7 +594,11 @@ function Index() {
     }
     try {
       localStorage.setItem(HOCA_PAROLA_KEY, yeniParola);
-    } catch {}
+    } catch {
+      setParolaDegistirHata("Parola kaydedilemedi.");
+      return;
+    }
+    toast.success("Parola başarıyla değiştirildi");
     setParolaDegistirAcik(false);
     setEskiParola("");
     setYeniParola("");
