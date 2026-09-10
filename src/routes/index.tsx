@@ -273,12 +273,7 @@ function useT() {
 function mevcutParola(): string {
   try {
     const kayitli = localStorage.getItem(HOCA_PAROLA_KEY);
-    // Eski parolayı temizle, herkes yeni varsayılan ile girebilsin
-    if (kayitli && kayitli !== VARSAYILAN_PAROLA) {
-      localStorage.removeItem(HOCA_PAROLA_KEY);
-      return VARSAYILAN_PAROLA;
-    }
-    return kayitli || VARSAYILAN_PAROLA;
+    return kayitli && kayitli.length > 0 ? kayitli : VARSAYILAN_PAROLA;
   } catch {
     return VARSAYILAN_PAROLA;
   }
