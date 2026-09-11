@@ -888,13 +888,22 @@ function Index() {
         {sekme === "aidat" ? (
           aidatListeAcik ? (
             <>
-            <div className="mb-3 flex justify-end">
-              <Button size="sm" variant="outline" onClick={() => aidatListePdf()}>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-base font-semibold text-foreground sm:text-lg">
+                Aidat Talebe Listesi
+              </h2>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => aidatListePdf()}
+                className="gap-1.5 text-xs sm:text-sm"
+              >
                 <FileDown className="h-4 w-4" /> PDF İndir
               </Button>
             </div>
             <Card className="overflow-hidden">
-              <Table className="table-fixed">
+              <div className="overflow-x-auto">
+              <Table className="table-fixed min-w-[540px]">
                 <colgroup>
                   <col className="w-[8%]" />
                   <col className="w-[12%]" />
@@ -993,6 +1002,7 @@ function Index() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </Card>
             </>
           ) : (
