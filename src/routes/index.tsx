@@ -1002,6 +1002,7 @@ function Index() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </Card>
             </>
           ) : (
