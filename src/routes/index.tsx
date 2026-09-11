@@ -903,7 +903,7 @@ function Index() {
             </div>
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
-              <Table className="table-fixed">
+              <Table className="table-fixed min-w-[540px]">
                 <colgroup>
                   <col className="w-[8%]" />
                   <col className="w-[12%]" />
