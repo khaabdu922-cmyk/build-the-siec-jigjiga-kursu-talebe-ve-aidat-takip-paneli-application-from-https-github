@@ -681,6 +681,27 @@ function Index() {
     });
   };
 
+  const aidatListePdf = () => {
+    listeYazdir({
+      altBaslik: "Aidat Talebe Listesi",
+      bilgi: [`Toplam talebe: ${aidatTalebeler.length}`],
+      sutunlar: [
+        { baslik: "Sıra No", genislik: "10%", hiza: "center" },
+        { baslik: "Talebe İsmi", genislik: "34%" },
+        { baslik: "Sınıf", genislik: "16%" },
+        { baslik: "Grup", genislik: "18%" },
+        { baslik: "Telefon", genislik: "22%" },
+      ],
+      satirlar: aidatTalebeler.map((t, i) => [
+        i + 1,
+        t.isim,
+        t.sinif || "—",
+        t.grup ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—") : "—",
+        t.telefon || "—",
+      ]),
+    });
+  };
+
   return (
     <DilContext.Provider value={dil}>
     <div className="min-h-screen bg-background">
@@ -866,62 +887,104 @@ function Index() {
 
         {sekme === "aidat" ? (
           aidatListeAcik ? (
+            <>
+            <div className="mb-3 flex justify-end">
+              <Button size="sm" variant="outline" onClick={() => aidatListePdf()}>
+                <FileDown className="h-4 w-4" /> PDF İndir
+              </Button>
+            </div>
             <Card className="overflow-hidden">
               <Table className="table-fixed">
                 <colgroup>
-                  <col className="w-[10%]" />
-                  <col className="w-[55%]" />
-                  <col className="w-[35%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[30%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[18%]" />
                 </colgroup>
                 <TableHeader>
                   <TableRow className="bg-muted/40">
-                    <TableHead className="px-2 text-center text-xs sm:px-4 sm:text-sm">
+                    <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
                       #
                     </TableHead>
-                    <TableHead className="px-2 text-xs sm:px-4 sm:text-sm">
-                      Talebe
+                    <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
+                      Profil
                     </TableHead>
-                    <TableHead className="px-2 text-xs sm:px-4 sm:text-sm">
+                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                      İsim
+                    </TableHead>
+                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                      Sınıf
+                    </TableHead>
+                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
                       Grup
+                    </TableHead>
+                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                      Telefon
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {aidatTalebeler.map((t, i) => (
                     <TableRow key={t.id} className="hover:bg-muted/30">
-                      <TableCell className="px-2 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                      <TableCell className="px-1 py-2 text-center text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                         {i + 1}
                       </TableCell>
-                      <TableCell className="min-w-0 px-2 py-2 font-medium sm:px-4 sm:py-3">
+                      <TableCell className="px-1 py-2 sm:px-3 sm:py-3">
                         <button
                           type="button"
                           onClick={() => {
                             setProfilAidattan(true);
                             setProfilGoster(t);
                           }}
-                          className="group flex w-full min-w-0 items-center gap-2 text-left text-xs hover:text-primary sm:gap-3 sm:text-sm"
+                          className="flex w-full justify-center"
                         >
-                          <span className="shrink-0">
+                          <span className="shrink-0 scale-90 sm:scale-100">
                             <TalebeAvatar talebe={t} boyut={36} />
-                          </span>
-                          <span className="min-w-0 truncate group-hover:underline">
-                            {t.isim}
                           </span>
                         </button>
                       </TableCell>
-                      <TableCell className="min-w-0 px-2 py-2 text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                      <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-3 sm:py-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProfilAidattan(true);
+                            setProfilGoster(t);
+                          }}
+                          className="block w-full min-w-0 truncate text-left text-[11px] hover:text-primary hover:underline sm:text-sm"
+                        >
+                          {t.isim}
+                        </button>
+                      </TableCell>
+                      <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                        <span className="block truncate">{t.sinif || "—"}</span>
+                      </TableCell>
+                      <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                         <span className="block truncate">
                           {t.grup
                             ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—")
                             : "—"}
                         </span>
                       </TableCell>
+                      <TableCell className="min-w-0 px-1 py-2 text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                        {t.telefon ? (
+                          <a
+                            href={`tel:${t.telefon.replace(/\s+/g, "")}`}
+                            className="block truncate hover:text-primary hover:underline"
+                          >
+                            {t.telefon}
+                          </a>
+                        ) : (
+                          <span className="block truncate">—</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {aidatTalebeler.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={3}
+                        colSpan={6}
                         className="py-10 text-center text-sm text-muted-foreground"
                       >
                         Henüz aidat kaydı olan talebe yok.
@@ -931,6 +994,7 @@ function Index() {
                 </TableBody>
               </Table>
             </Card>
+            </>
           ) : (
             <AidatPanel
               talebeler={aidatTalebeler}
@@ -1259,6 +1323,19 @@ function Index() {
                 Aidat Listesini PDF İndir
               </span>
             </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+              onClick={() => {
+                setAyarlarAcik(false);
+                setTimeout(() => aidatListePdf(), 150);
+              }}
+            >
+              <FileDown className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                Aidat Talebe Listesi PDF İndir
+              </span>
+            </button>
             {hocaModu && (
               <>
                 <button
@@ -1515,7 +1592,7 @@ function ProfilDiyalog({
   onFotoDegistir: (t: Talebe, fotoUrl: string) => void;
   onNotKaydet: (
     t: Talebe,
-    patch: Partial<Pick<Talebe, "telefon" | "notlar" | "isim">>,
+    patch: Partial<Pick<Talebe, "telefon" | "notlar" | "isim" | "sinif">>,
   ) => void;
   onSil: () => void;
 }) {
@@ -1523,6 +1600,7 @@ function ProfilDiyalog({
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState<string | null>(null);
   const [telefon, setTelefon] = useState("");
+  const [sinif, setSinif] = useState("");
   const [notlar, setNotlar] = useState("");
   const [fotoBuyuk, setFotoBuyuk] = useState(false);
   const [isimDuzenle, setIsimDuzenle] = useState(false);
@@ -1532,6 +1610,7 @@ function ProfilDiyalog({
   useEffect(() => {
     if (talebe) {
       setTelefon(talebe.telefon ?? "");
+      setSinif(talebe.sinif ?? "");
       setNotlar(talebe.notlar ?? "");
       setHata(null);
       setIsimDuzenle(false);
@@ -1703,6 +1782,18 @@ function ProfilDiyalog({
         <div className="mt-1 space-y-2">
           <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5 text-sm">
+              Sınıf
+            </Label>
+            <Input
+              value={sinif}
+              onChange={(e) => setSinif(e.target.value.slice(0, 40))}
+              disabled={!hocaModu}
+              placeholder="—"
+              className="text-base"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-sm">
               <Phone className="h-3.5 w-3.5" /> {t("telefon")}
             </Label>
             <div className="flex gap-2">
@@ -1750,6 +1841,7 @@ function ProfilDiyalog({
               onClick={() => {
                 onNotKaydet(talebe, {
                   telefon: telefon.trim(),
+                  sinif: sinif.trim(),
                   notlar: notlar.trim(),
                 });
                 onClose();

@@ -47,6 +47,7 @@ export type Talebe = {
   hadisGunler?: Record<string, number[]>;
   aidat?: Record<string, boolean>;
   grup?: Grup;
+  sinif?: string;
   aidatSadece?: boolean;
   aidatHaric?: boolean;
 };
@@ -99,6 +100,7 @@ export function talebeleriDinle(
             v.grup === "seviye1" || v.grup === "seviye2" || v.grup === "hazirlik"
               ? v.grup
               : undefined,
+          sinif: typeof v.sinif === "string" ? v.sinif : undefined,
           aidatSadece: v.aidatSadece === true,
           aidatHaric: v.aidatHaric === true,
         };
