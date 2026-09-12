@@ -265,8 +265,8 @@ export async function aidatTutariniOku(): Promise<number> {
   try {
     const snap = await getDoc(doc(db, AYAR_COL, AYAR_DOC));
     const v = snap.data()?.aidatTutar;
-    aidatTutarCache = typeof v === "number" ? v : 0;
-    return aidatTutarCache;
+    aidatCacheYaz(typeof v === "number" ? v : 0);
+    return aidatTutarCache as number;
   } catch {
     return 0;
   }
@@ -274,27 +274,27 @@ export async function aidatTutariniOku(): Promise<number> {
 
 export function aidatTutariniDinle(cb: (tutar: number) => void) {
   aidatAboneler.add(cb);
-  if (aidatTutarCache !== null) cb(aidatTutarCache);
+  const onbellek = aidatOnbellek();
+  if (onbellek !== null) cb(onbellek);
 
+  // Dinleyici açık kalır: tutar başka bir cihazda değişirse anında yansır.
   if (!aidatUnsub) {
     aidatUnsub = onSnapshot(doc(db, AYAR_COL, AYAR_DOC), (snap) => {
       const v = snap.data()?.aidatTutar;
-      aidatTutarCache = typeof v === "number" ? v : 0;
+      aidatCacheYaz(typeof v === "number" ? v : 0);
       aidatAboneler.forEach((f) => f(aidatTutarCache as number));
     });
   }
 
   return () => {
     aidatAboneler.delete(cb);
-    if (aidatAboneler.size === 0 && aidatUnsub) {
-      aidatUnsub();
-      aidatUnsub = null;
-    }
   };
 }
 
 export async function aidatTutariKaydet(tutar: number) {
-  aidatTutarCache = tutar;
+  // İyimser güncelleme: ekranda anında görünür.
+  aidatCacheYaz(tutar);
+  aidatAboneler.forEach((f) => f(tutar));
   await setDoc(doc(db, AYAR_COL, AYAR_DOC), { aidatTutar: tutar }, { merge: true });
 }
 
