@@ -136,11 +136,12 @@ function baslatTalebeDinleyici() {
           aidatHaric: v.aidatHaric === true,
         };
       });
-      cb(liste);
+      talebeCache = liste;
+      talebeAboneler.forEach((f) => f(liste));
     },
     (err) => {
       console.error("Firestore dinleme hatası", err);
-      onError?.(err);
+      talebeHataAboneler.forEach((f) => f(err));
     },
   );
 }
