@@ -165,8 +165,7 @@ function baslatTalebeDinleyici() {
           aidatHaric: v.aidatHaric === true,
         };
       });
-      talebeCache = liste;
-      talebeAboneler.forEach((f) => f(liste));
+      talebeCacheYaz(liste);
     },
     (err) => {
       console.error("Firestore dinleme hatası", err);
