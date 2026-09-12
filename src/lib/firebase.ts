@@ -17,7 +17,23 @@ const firebaseConfig = {
 };
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Tarayıcıda kalıcı (IndexedDB) önbellek: veriler anında yerelden gelir,
+// gereksiz ağ sorguları yapılmaz. Sunucuda düz Firestore kullanılır.
+function firestoreOlustur() {
+  if (typeof window === "undefined") return getFirestore(app);
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager(),
+      }),
+    });
+  } catch {
+    return getFirestore(app);
+  }
+}
+
+export const db = firestoreOlustur();
 
 // Analytics yalnızca tarayıcıda ve destekleniyorsa başlatılır.
 if (typeof window !== "undefined") {
