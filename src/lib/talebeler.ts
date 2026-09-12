@@ -174,7 +174,23 @@ function baslatTalebeDinleyici() {
   );
 }
 
+// Sunucu yanıtı beklenmeden yerel listeyi/önbelleği günceller.
+function iyimserUygula(
+  degistir: (liste: Talebe[]) => Talebe[],
+  kalici = false,
+) {
+  const mevcut = talebeleriOnbellektenOku();
+  if (!mevcut) return;
+  talebeCacheYaz(degistir(mevcut), kalici);
+}
+
 export async function talebeEkle(t: Omit<Talebe, "id">) {
+  const gecici = `gecici-${Date.now()}`;
+  iyimserUygula((l) =>
+    [...l, { ...(t as Omit<Talebe, "id">), id: gecici } as Talebe].sort(
+      (a, b) => (a.sira ?? 0) - (b.sira ?? 0),
+    ),
+  );
   const ref = await addDoc(collection(db, COL), t);
   return ref.id;
 }
@@ -183,14 +199,24 @@ export async function talebeGuncelle(
   id: string,
   patch: Partial<Omit<Talebe, "id">>,
 ) {
+  iyimserUygula(
+    (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    true,
+  );
   await updateDoc(doc(db, COL, id), patch as Record<string, unknown>);
 }
 
 export async function talebeSil(id: string) {
+  iyimserUygula((l) => l.filter((t) => t.id !== id), true);
   await deleteDoc(doc(db, COL, id));
 }
 
 export async function topluHedefGuncelle(ids: string[], hedef: number) {
+  iyimserUygula(
+    (l) =>
+      l.map((t) => (ids.includes(t.id) ? { ...t, hedefHaftalik: hedef } : t)),
+    true,
+  );
   const batch = writeBatch(db);
   ids.forEach((id) =>
     batch.update(doc(db, COL, id), { hedefHaftalik: hedef }),
