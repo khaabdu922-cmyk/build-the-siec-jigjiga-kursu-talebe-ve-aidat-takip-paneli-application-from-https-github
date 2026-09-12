@@ -57,12 +57,40 @@ const COL = "talebeler";
 // ---- Paylaşımlı önbellek + tekil dinleyici ----
 // Aynı veriyi kullanan bileşenler tek bir Firestore aboneliğini paylaşır;
 // yeni abone olanlara son bilinen veri anında verilir.
+const TALEBE_CACHE_KEY = "talebe-takip-cache-v1";
+
 let talebeCache: Talebe[] | null = null;
 let talebeUnsub: (() => void) | null = null;
 const talebeAboneler = new Set<(t: Talebe[]) => void>();
 const talebeHataAboneler = new Set<(e: Error) => void>();
 
+function yereldenYukle(): Talebe[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(TALEBE_CACHE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? (v as Talebe[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function yereleYaz(liste: Talebe[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
+  } catch {}
+}
+
+function talebeCacheYaz(liste: Talebe[], kalici = true) {
+  talebeCache = liste;
+  if (kalici) yereleYaz(liste);
+  talebeAboneler.forEach((f) => f(liste));
+}
+
 export function talebeleriOnbellektenOku(): Talebe[] | null {
+  if (!talebeCache) talebeCache = yereldenYukle();
   return talebeCache;
 }
 
@@ -72,8 +100,13 @@ export function talebeleriDinle(
 ) {
   talebeAboneler.add(cb);
   if (onError) talebeHataAboneler.add(onError);
-  if (talebeCache) cb(talebeCache);
 
+  // Stale-while-revalidate: önce önbellek, sonra canlı veri.
+  const onbellek = talebeleriOnbellektenOku();
+  if (onbellek) cb(onbellek);
+
+  // Dinleyici bir kez kurulur ve açık kalır: diğer cihazlardaki
+  // değişiklikler anında (saniyeler içinde) buraya düşer.
   if (!talebeUnsub) {
     talebeUnsub = baslatTalebeDinleyici();
   }
@@ -81,10 +114,6 @@ export function talebeleriDinle(
   return () => {
     talebeAboneler.delete(cb);
     if (onError) talebeHataAboneler.delete(onError);
-    if (talebeAboneler.size === 0 && talebeUnsub) {
-      talebeUnsub();
-      talebeUnsub = null;
-    }
   };
 }
 
@@ -136,8 +165,7 @@ function baslatTalebeDinleyici() {
           aidatHaric: v.aidatHaric === true,
         };
       });
-      talebeCache = liste;
-      talebeAboneler.forEach((f) => f(liste));
+      talebeCacheYaz(liste);
     },
     (err) => {
       console.error("Firestore dinleme hatası", err);
@@ -146,7 +174,23 @@ function baslatTalebeDinleyici() {
   );
 }
 
+// Sunucu yanıtı beklenmeden yerel listeyi/önbelleği günceller.
+function iyimserUygula(
+  degistir: (liste: Talebe[]) => Talebe[],
+  kalici = false,
+) {
+  const mevcut = talebeleriOnbellektenOku();
+  if (!mevcut) return;
+  talebeCacheYaz(degistir(mevcut), kalici);
+}
+
 export async function talebeEkle(t: Omit<Talebe, "id">) {
+  const gecici = `gecici-${Date.now()}`;
+  iyimserUygula((l) =>
+    [...l, { ...(t as Omit<Talebe, "id">), id: gecici } as Talebe].sort(
+      (a, b) => (a.sira ?? 0) - (b.sira ?? 0),
+    ),
+  );
   const ref = await addDoc(collection(db, COL), t);
   return ref.id;
 }
@@ -155,14 +199,24 @@ export async function talebeGuncelle(
   id: string,
   patch: Partial<Omit<Talebe, "id">>,
 ) {
+  iyimserUygula(
+    (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    true,
+  );
   await updateDoc(doc(db, COL, id), patch as Record<string, unknown>);
 }
 
 export async function talebeSil(id: string) {
+  iyimserUygula((l) => l.filter((t) => t.id !== id), true);
   await deleteDoc(doc(db, COL, id));
 }
 
 export async function topluHedefGuncelle(ids: string[], hedef: number) {
+  iyimserUygula(
+    (l) =>
+      l.map((t) => (ids.includes(t.id) ? { ...t, hedefHaftalik: hedef } : t)),
+    true,
+  );
   const batch = writeBatch(db);
   ids.forEach((id) =>
     batch.update(doc(db, COL, id), { hedefHaftalik: hedef }),
@@ -175,18 +229,44 @@ export async function topluHedefGuncelle(ids: string[], hedef: number) {
 const AYAR_COL = "ayarlar";
 const AYAR_DOC = "genel";
 
+const AIDAT_CACHE_KEY = "aidat-tutar-cache-v1";
+
 let aidatTutarCache: number | null = null;
 let aidatUnsub: (() => void) | null = null;
 const aidatAboneler = new Set<(t: number) => void>();
 
+function aidatOnbellek(): number | null {
+  if (aidatTutarCache !== null) return aidatTutarCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AIDAT_CACHE_KEY);
+    if (raw === null) return null;
+    const n = Number(raw);
+    aidatTutarCache = Number.isFinite(n) ? n : null;
+    return aidatTutarCache;
+  } catch {
+    return null;
+  }
+}
+
+function aidatCacheYaz(tutar: number) {
+  aidatTutarCache = tutar;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(AIDAT_CACHE_KEY, String(tutar));
+    } catch {}
+  }
+}
+
 export async function aidatTutariniOku(): Promise<number> {
   // Dinleyici açıksa ya da daha önce okunduysa ağ sorgusu yapılmaz.
-  if (aidatTutarCache !== null) return aidatTutarCache;
+  const onbellek = aidatOnbellek();
+  if (onbellek !== null) return onbellek;
   try {
     const snap = await getDoc(doc(db, AYAR_COL, AYAR_DOC));
     const v = snap.data()?.aidatTutar;
-    aidatTutarCache = typeof v === "number" ? v : 0;
-    return aidatTutarCache;
+    aidatCacheYaz(typeof v === "number" ? v : 0);
+    return aidatTutarCache as number;
   } catch {
     return 0;
   }
@@ -194,27 +274,27 @@ export async function aidatTutariniOku(): Promise<number> {
 
 export function aidatTutariniDinle(cb: (tutar: number) => void) {
   aidatAboneler.add(cb);
-  if (aidatTutarCache !== null) cb(aidatTutarCache);
+  const onbellek = aidatOnbellek();
+  if (onbellek !== null) cb(onbellek);
 
+  // Dinleyici açık kalır: tutar başka bir cihazda değişirse anında yansır.
   if (!aidatUnsub) {
     aidatUnsub = onSnapshot(doc(db, AYAR_COL, AYAR_DOC), (snap) => {
       const v = snap.data()?.aidatTutar;
-      aidatTutarCache = typeof v === "number" ? v : 0;
+      aidatCacheYaz(typeof v === "number" ? v : 0);
       aidatAboneler.forEach((f) => f(aidatTutarCache as number));
     });
   }
 
   return () => {
     aidatAboneler.delete(cb);
-    if (aidatAboneler.size === 0 && aidatUnsub) {
-      aidatUnsub();
-      aidatUnsub = null;
-    }
   };
 }
 
 export async function aidatTutariKaydet(tutar: number) {
-  aidatTutarCache = tutar;
+  // İyimser güncelleme: ekranda anında görünür.
+  aidatCacheYaz(tutar);
+  aidatAboneler.forEach((f) => f(tutar));
   await setDoc(doc(db, AYAR_COL, AYAR_DOC), { aidatTutar: tutar }, { merge: true });
 }
 
