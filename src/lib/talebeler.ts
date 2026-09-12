@@ -175,24 +175,46 @@ export async function topluHedefGuncelle(ids: string[], hedef: number) {
 const AYAR_COL = "ayarlar";
 const AYAR_DOC = "genel";
 
+let aidatTutarCache: number | null = null;
+let aidatUnsub: (() => void) | null = null;
+const aidatAboneler = new Set<(t: number) => void>();
+
 export async function aidatTutariniOku(): Promise<number> {
+  // Dinleyici açıksa ya da daha önce okunduysa ağ sorgusu yapılmaz.
+  if (aidatTutarCache !== null) return aidatTutarCache;
   try {
     const snap = await getDoc(doc(db, AYAR_COL, AYAR_DOC));
     const v = snap.data()?.aidatTutar;
-    return typeof v === "number" ? v : 0;
+    aidatTutarCache = typeof v === "number" ? v : 0;
+    return aidatTutarCache;
   } catch {
     return 0;
   }
 }
 
 export function aidatTutariniDinle(cb: (tutar: number) => void) {
-  return onSnapshot(doc(db, AYAR_COL, AYAR_DOC), (snap) => {
-    const v = snap.data()?.aidatTutar;
-    cb(typeof v === "number" ? v : 0);
-  });
+  aidatAboneler.add(cb);
+  if (aidatTutarCache !== null) cb(aidatTutarCache);
+
+  if (!aidatUnsub) {
+    aidatUnsub = onSnapshot(doc(db, AYAR_COL, AYAR_DOC), (snap) => {
+      const v = snap.data()?.aidatTutar;
+      aidatTutarCache = typeof v === "number" ? v : 0;
+      aidatAboneler.forEach((f) => f(aidatTutarCache as number));
+    });
+  }
+
+  return () => {
+    aidatAboneler.delete(cb);
+    if (aidatAboneler.size === 0 && aidatUnsub) {
+      aidatUnsub();
+      aidatUnsub = null;
+    }
+  };
 }
 
 export async function aidatTutariKaydet(tutar: number) {
+  aidatTutarCache = tutar;
   await setDoc(doc(db, AYAR_COL, AYAR_DOC), { aidatTutar: tutar }, { merge: true });
 }
 
