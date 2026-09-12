@@ -229,13 +229,39 @@ export async function topluHedefGuncelle(ids: string[], hedef: number) {
 const AYAR_COL = "ayarlar";
 const AYAR_DOC = "genel";
 
+const AIDAT_CACHE_KEY = "aidat-tutar-cache-v1";
+
 let aidatTutarCache: number | null = null;
 let aidatUnsub: (() => void) | null = null;
 const aidatAboneler = new Set<(t: number) => void>();
 
+function aidatOnbellek(): number | null {
+  if (aidatTutarCache !== null) return aidatTutarCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AIDAT_CACHE_KEY);
+    if (raw === null) return null;
+    const n = Number(raw);
+    aidatTutarCache = Number.isFinite(n) ? n : null;
+    return aidatTutarCache;
+  } catch {
+    return null;
+  }
+}
+
+function aidatCacheYaz(tutar: number) {
+  aidatTutarCache = tutar;
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(AIDAT_CACHE_KEY, String(tutar));
+    } catch {}
+  }
+}
+
 export async function aidatTutariniOku(): Promise<number> {
   // Dinleyici açıksa ya da daha önce okunduysa ağ sorgusu yapılmaz.
-  if (aidatTutarCache !== null) return aidatTutarCache;
+  const onbellek = aidatOnbellek();
+  if (onbellek !== null) return onbellek;
   try {
     const snap = await getDoc(doc(db, AYAR_COL, AYAR_DOC));
     const v = snap.data()?.aidatTutar;
