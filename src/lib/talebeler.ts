@@ -54,10 +54,41 @@ export type Talebe = {
 
 const COL = "talebeler";
 
+// ---- Paylaşımlı önbellek + tekil dinleyici ----
+// Aynı veriyi kullanan bileşenler tek bir Firestore aboneliğini paylaşır;
+// yeni abone olanlara son bilinen veri anında verilir.
+let talebeCache: Talebe[] | null = null;
+let talebeUnsub: (() => void) | null = null;
+const talebeAboneler = new Set<(t: Talebe[]) => void>();
+const talebeHataAboneler = new Set<(e: Error) => void>();
+
+export function talebeleriOnbellektenOku(): Talebe[] | null {
+  return talebeCache;
+}
+
 export function talebeleriDinle(
   cb: (t: Talebe[]) => void,
   onError?: (e: Error) => void,
 ) {
+  talebeAboneler.add(cb);
+  if (onError) talebeHataAboneler.add(onError);
+  if (talebeCache) cb(talebeCache);
+
+  if (!talebeUnsub) {
+    talebeUnsub = baslatTalebeDinleyici();
+  }
+
+  return () => {
+    talebeAboneler.delete(cb);
+    if (onError) talebeHataAboneler.delete(onError);
+    if (talebeAboneler.size === 0 && talebeUnsub) {
+      talebeUnsub();
+      talebeUnsub = null;
+    }
+  };
+}
+
+function baslatTalebeDinleyici() {
   const q = query(collection(db, COL), orderBy("sira", "asc"));
   return onSnapshot(
     q,
