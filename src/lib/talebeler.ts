@@ -57,12 +57,40 @@ const COL = "talebeler";
 // ---- Paylaşımlı önbellek + tekil dinleyici ----
 // Aynı veriyi kullanan bileşenler tek bir Firestore aboneliğini paylaşır;
 // yeni abone olanlara son bilinen veri anında verilir.
+const TALEBE_CACHE_KEY = "talebe-takip-cache-v1";
+
 let talebeCache: Talebe[] | null = null;
 let talebeUnsub: (() => void) | null = null;
 const talebeAboneler = new Set<(t: Talebe[]) => void>();
 const talebeHataAboneler = new Set<(e: Error) => void>();
 
+function yereldenYukle(): Talebe[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(TALEBE_CACHE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? (v as Talebe[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function yereleYaz(liste: Talebe[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
+  } catch {}
+}
+
+function talebeCacheYaz(liste: Talebe[], kalici = true) {
+  talebeCache = liste;
+  if (kalici) yereleYaz(liste);
+  talebeAboneler.forEach((f) => f(liste));
+}
+
 export function talebeleriOnbellektenOku(): Talebe[] | null {
+  if (!talebeCache) talebeCache = yereldenYukle();
   return talebeCache;
 }
 
@@ -72,8 +100,13 @@ export function talebeleriDinle(
 ) {
   talebeAboneler.add(cb);
   if (onError) talebeHataAboneler.add(onError);
-  if (talebeCache) cb(talebeCache);
 
+  // Stale-while-revalidate: önce önbellek, sonra canlı veri.
+  const onbellek = talebeleriOnbellektenOku();
+  if (onbellek) cb(onbellek);
+
+  // Dinleyici bir kez kurulur ve açık kalır: diğer cihazlardaki
+  // değişiklikler anında (saniyeler içinde) buraya düşer.
   if (!talebeUnsub) {
     talebeUnsub = baslatTalebeDinleyici();
   }
@@ -81,10 +114,6 @@ export function talebeleriDinle(
   return () => {
     talebeAboneler.delete(cb);
     if (onError) talebeHataAboneler.delete(onError);
-    if (talebeAboneler.size === 0 && talebeUnsub) {
-      talebeUnsub();
-      talebeUnsub = null;
-    }
   };
 }
 
