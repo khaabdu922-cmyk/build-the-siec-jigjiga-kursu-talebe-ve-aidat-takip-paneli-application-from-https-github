@@ -41,8 +41,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-// Ağır panel yalnızca Aidat sekmesi açıldığında yüklenir.
+// Bu iki panel yalnızca açıldıklarında yüklenir (açılış hızı için).
 const AidatPanel = lazy(() => import("@/components/AidatPanel"));
+const AidatHatirlatma = lazy(() => import("@/components/AidatHatirlatma"));
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +53,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -83,6 +85,7 @@ import {
   Settings,
   Wallet,
   Users,
+  Mail,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -90,18 +93,21 @@ import {
   talebeEkle,
   talebeGuncelle,
   talebeSil,
-  GRUPLAR,
+  gruplariKaydet,
+  yeniGrupId,
   type Grup,
+  type GrupBilgi,
   type Talebe,
   type SayfaKaydi,
   type KiraatYonu,
   type Ders,
 } from "@/lib/talebeler";
 import { dosyaFotoDataUrl, bashHarfler } from "@/lib/foto";
-import { aidatTutariniOku } from "@/lib/talebeler";
-// PDF modülü yalnızca indirme butonuna basıldığında yüklenir.
-const listeYazdir = async (...args: Parameters<typeof import("@/lib/pdf").listeYazdir>) =>
-  (await import("@/lib/pdf")).listeYazdir(...args);
+import { aidatTutariniOku, hocaMailAyarDinle, talebeleriTazele } from "@/lib/talebeler";
+import { useBugun } from "@/lib/bugun";
+import { useGruplar } from "@/hooks/use-gruplar";
+import { listeYazdir } from "@/lib/pdf";
+import { excelIndir, excelOku } from "@/lib/excel";
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/")({
@@ -141,7 +147,7 @@ const SOZLUK = {
   tr: {
     baslik: "SİEC JİGJİGA KURSU",
     altBaslikHafizlik: "Hafızlık takip paneli",
-    altBaslikAidat: "Aidat takip paneli",
+    altBaslikAidat: "Aidat Listesi",
     girisYap: "Giriş Yap",
     girisYapKisa: "Giriş yap",
     hocaefendiGirisi: "Hocaefendi Girişi",
@@ -164,7 +170,7 @@ const SOZLUK = {
     eminMisiniz: "Emin misiniz?",
     silmeOnay: "Bu talebe kalıcı olarak silinecek. İşlem geri alınamaz.",
     evetSil: "Evet, sil",
-    talebeEkle: "Talebe Ekle",
+    talebeEkle: "Hafizlik Talebe Ekle",
     haftaRaporu: "Haftanın Raporu",
     haftaninRaporu: "Haftanın Raporu",
     vermedi: "Vermedi",
@@ -206,10 +212,13 @@ const SOZLUK = {
     sayfaKisa: "sf",
     cuzKisa: "cüz",
     cuzTam: ". cüz",
+    hafizlikIlerlemesi: "Hafızlık İlerlemesi",
     hedefSf: "Hedef",
     sfPerHafta: "sf/hafta",
     telefon: "Telefon",
     notlar: "Notlar",
+    sinif: "Sınıf",
+    dogumTarihi: "Doğum tarihi",
     ara: "Ara",
     isimVeIlerleme: "İsim & ilerleme",
     fotoBuyutGorunum: "Büyütülmüş fotoğraf görünümü.",
@@ -290,6 +299,17 @@ function cuzHesapla(sayfa: number) {
   return Math.min(30, Math.floor((sayfa - 1) / SAYFA_BASINA_CUZ) + 1);
 }
 
+function yasHesapla(dogum?: string): number | null {
+  if (!dogum) return null;
+  const d = new Date(dogum);
+  if (isNaN(d.getTime())) return null;
+  const simdi = new Date();
+  let yas = simdi.getFullYear() - d.getFullYear();
+  const ayFark = simdi.getMonth() - d.getMonth();
+  if (ayFark < 0 || (ayFark === 0 && simdi.getDate() < d.getDate())) yas--;
+  return yas >= 0 && yas < 130 ? yas : null;
+}
+
 function gunBaslangici(d = new Date()) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -364,17 +384,20 @@ function toggleGun(mevcut: number[], gun: number): number[] {
 
 function Index() {
   const [hoca, setHoca] = useState("Hocaefendi");
-  const [talebeler, setTalebeler] = useState<Talebe[]>(() => {
-    if (typeof window === "undefined") return [];
+  const [talebeler, setTalebeler] = useState<Talebe[]>([]);
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(TALEBE_CACHE_KEY);
-      if (!raw) return [];
+      if (!raw) return;
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as Talebe[]) : [];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setTalebeler(parsed as Talebe[]);
+      }
     } catch {
-      return [];
+      /* yoksay */
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [yuklendi, setYuklendi] = useState(false);
   const [yuklemeHata, setYuklemeHata] = useState<string | null>(null);
 
@@ -387,6 +410,7 @@ function Index() {
   const [duzenlenen, setDuzenlenen] = useState<Talebe | null>(null);
   const [profilGoster, setProfilGoster] = useState<Talebe | null>(null);
   const [profilAidattan, setProfilAidattan] = useState(false);
+  const [profilDetayli, setProfilDetayli] = useState(false);
   const [duzenleAidattan, setDuzenleAidattan] = useState(false);
   const [duzenleSayfaOdakli, setDuzenleSayfaOdakli] = useState(false);
   const [hocaDuzenle, setHocaDuzenle] = useState(false);
@@ -395,7 +419,37 @@ function Index() {
   const [seciliGun, setSeciliGun] = useState<number>(() => bugununGunu());
   const seciliDers: Ders = "kuran";
 
+  const [menuAcik, setMenuAcik] = useState(false);
   const [ayarlarAcik, setAyarlarAcik] = useState(false);
+  const [mailAcik, setMailAcik] = useState(false);
+  // Panel menüden açıldıysa, kapanınca menüye geri dön
+  const menudenAcildi = useRef(false);
+  // Alt ekran Ayarlar'dan açıldıysa, kapanınca Ayarlar'a geri dön
+  const ayarlardanAcildi = useRef(false);
+  const ayarlaraDon = () => {
+    if (ayarlardanAcildi.current) {
+      ayarlardanAcildi.current = false;
+      setAyarlarAcik(true);
+    }
+  };
+  const panelKapat =
+    (kapat: (v: boolean) => void) =>
+    (acik: boolean) => {
+      kapat(acik);
+      if (!acik) {
+        if (ayarlardanAcildi.current) {
+          ayarlaraDon();
+          return;
+        }
+        if (menudenAcildi.current) {
+          menudenAcildi.current = false;
+          setMenuAcik(true);
+        }
+      }
+    };
+  const ayarlarKapat = () => panelKapat(setAyarlarAcik)(false);
+  const gruplarKapat = () => panelKapat(setGruplarAcik)(false);
+  const [aidatIndirAy, setAidatIndirAy] = useState<string>("buAy");
   const [parolaDegistirAcik, setParolaDegistirAcik] = useState(false);
   const [eskiParola, setEskiParola] = useState("");
   const [yeniParola, setYeniParola] = useState("");
@@ -405,6 +459,17 @@ function Index() {
   const [sekme, setSekme] = useState<"hafizlik" | "aidat">("hafizlik");
   const [grupFiltre, setGrupFiltre] = useState<Grup | "hepsi">("hepsi");
   const [aidatListeAcik, setAidatListeAcik] = useState(false);
+  const gruplar = useGruplar();
+  const [grupTaslak, setGrupTaslak] = useState<GrupBilgi[] | null>(null);
+  const [yeniTalebeAcik, setYeniTalebeAcik] = useState<null | "hafiz" | "aidat">(null);
+  const [yeniTalebe, setYeniTalebe] = useState({
+    isim: "",
+    sinif: "",
+    dogum: "",
+    telefon: "",
+    notlar: "",
+    grup: "",
+  });
 
   const [vermediAcik, setVermediAcik] = useState(false);
 
@@ -441,18 +506,49 @@ function Index() {
       const ad = localStorage.getItem(HOCA_AD_KEY);
       if (ad) setHoca(ad);
       if (sessionStorage.getItem(HOCA_OTURUM_KEY) === "1") setHocaModu(true);
-    } catch {
-      // yoksay
-    }
+    } catch {}
   }, []);
+
+  // Gün değişince seçili gün ve hafta otomatik olarak bugüne taşınır.
+  // Kullanıcı geçmiş/gelecek bir haftaya gitmişse orada kalır.
+  const bugun = useBugun();
+  const oncekiBugun = useRef(bugun);
+  useEffect(() => {
+    if (oncekiBugun.current === bugun) return;
+    const eskiHaftaBaslangic = haftaBaslangici(new Date(oncekiBugun.current));
+    oncekiBugun.current = bugun;
+    setSeciliGun(bugununGunu());
+    setSeciliHafta((h) => (h === eskiHaftaBaslangic ? haftaBaslangici() : h));
+  }, [bugun]);
 
   useEffect(() => {
     try {
       localStorage.setItem(HOCA_AD_KEY, hoca);
-    } catch {
-      // yoksay
-    }
+    } catch {}
   }, [hoca]);
+
+  // Yeni ay geldiğinde aidat hatırlatma e-postası uyarısı
+  useEffect(() => {
+    if (!hocaModu) return;
+    const d = new Date();
+    const ayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const unsub = hocaMailAyarDinle((a) => {
+      const gonderilen = a.gonderilen[ayKey] ?? [];
+      const bekleyen = gruplar.filter(
+        (g) => (a.mailler[g.id] ?? "").trim() && !gonderilen.includes(g.id),
+      );
+      if (bekleyen.length === 0) return;
+      toast.info(`Bu ay ${bekleyen.length} hocaya aidat hatırlatması gönderilmedi.`, {
+        id: "aidat-hatirlatma",
+        duration: 8000,
+        action: {
+          label: "Ayarları aç",
+          onClick: () => setAyarlarAcik(true),
+        },
+      });
+    });
+    return () => unsub();
+  }, [hocaModu]);
 
   // Firestore canlı veri
   useEffect(() => {
@@ -462,9 +558,7 @@ function Index() {
         setYuklendi(true);
         try {
           localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
-        } catch {
-          // yoksay
-        }
+        } catch {}
       },
       (e) => {
         setYuklemeHata(e.message);
@@ -486,8 +580,9 @@ function Index() {
 
   const sil = (id: string) => {
     const mevcut = talebeler.find((t) => t.id === id);
-    // Hafızlık listesinden çıkar; aidat listesinde kalmaya devam etsin.
-    if (mevcut && !mevcut.aidatHaric) {
+    // Her iki listedeyse önce hafızlıktan çıkar (aidat listesinde kalsın);
+    // tek bir listedeyse kaydı tamamen sil.
+    if (mevcut && !mevcut.aidatSadece && !mevcut.aidatHaric) {
       void talebeGuncelle(id, { aidatSadece: true });
       return;
     }
@@ -521,10 +616,17 @@ function Index() {
   };
 
   const ekle = (sadeceAidat = false) => {
-    const yeniNo = talebeler.length + 1;
+    // Boş formu aç; kaydet ancak tüm bilgiler doldurulunca yapılır.
+    setYeniTalebe({ isim: "", sinif: "", dogum: "", telefon: "", notlar: "", grup: "" });
+    setYeniTalebeAcik(sadeceAidat ? "aidat" : "hafiz");
+  };
+
+  const yeniTalebeKaydet = () => {
+    const isim = yeniTalebe.isim.trim();
+    if (!isim) return;
     const enBuyukSira = talebeler.reduce((m, t) => Math.max(m, t.sira ?? 0), 0);
-    void talebeEkle({
-      isim: `Talebe ${yeniNo}`,
+    const patch: Omit<Talebe, "id"> = {
+      isim,
       kiraat: false,
       sayfa: 1,
       gecmis: [{ t: Date.now(), sayfa: 1 }],
@@ -532,13 +634,37 @@ function Index() {
       yon: "alttan",
       fikihKonu: 1,
       hadisNo: 1,
-      aidatSadece: sadeceAidat,
-      aidatHaric: false,
-    });
+    aidatSadece: yeniTalebeAcik === "aidat",
+      aidatHaric: yeniTalebeAcik !== "aidat",
+    };
+    const sinif = yeniTalebe.sinif.trim();
+    const dogum = yeniTalebe.dogum.trim();
+    const telefon = yeniTalebe.telefon.trim();
+    const notlar = yeniTalebe.notlar.trim();
+    if (sinif) patch.sinif = sinif;
+    if (dogum) patch.dogum = dogum;
+    if (telefon) patch.telefon = telefon;
+    if (notlar) patch.notlar = notlar;
+    if (yeniTalebe.grup) patch.grup = yeniTalebe.grup;
+    void talebeEkle(patch);
+    setYeniTalebeAcik(null);
+    ayarlaraDon();
+    toast.success(`${isim} eklendi`);
   };
 
   const hafizTalebeler = useMemo(() => talebeler.filter((t) => !t.aidatSadece), [talebeler]);
   const aidatTalebeler = useMemo(() => talebeler.filter((t) => !t.aidatHaric), [talebeler]);
+
+  // PDF / Excel indirmeden hemen önce verileri sunucudan tazeler; böylece
+  // çıktı her zaman en son değişiklikleri içerir.
+  const tazeListeler = async () => {
+    const liste = await talebeleriTazele();
+    return {
+      tum: liste,
+      hafiz: liste.filter((t) => !t.aidatSadece),
+      aidat: liste.filter((t) => !t.aidatHaric),
+    };
+  };
 
   const haftalikToplam = useMemo(
     () => hafizTalebeler.reduce((acc, t) => acc + ilerleme(t, seciliHafta, haftaSonu), 0),
@@ -591,6 +717,7 @@ function Index() {
     }
     toast.success("Parola başarıyla değiştirildi");
     setParolaDegistirAcik(false);
+    ayarlaraDon();
     setEskiParola("");
     setYeniParola("");
     setYeniParolaTekrar("");
@@ -598,50 +725,94 @@ function Index() {
   };
 
   const hafizlikPdf = async () => {
-    const gunler = tr("haftaGun").slice(0, 5);
-    await listeYazdir({
+    const { hafiz } = await tazeListeler();
+    listeYazdir({
       altBaslik: "Hafızlık Takip Listesi",
-      bilgi: [`Hafta: ${haftaEtiket(seciliHafta)}`, `Hocaefendi: ${hoca}`],
+      bilgi: [`Hocaefendi: ${hoca}`],
       sutunlar: [
-        { baslik: "#", genislik: "6%", hiza: "center" },
-        { baslik: "Talebe", genislik: "34%" },
-        ...gunler.map((g) => ({
-          baslik: g.slice(0, 3),
-          genislik: "8%",
-          hiza: "center" as const,
-        })),
-        { baslik: "Sayfa", genislik: "10%", hiza: "center" },
-        { baslik: "Cüz", genislik: "10%", hiza: "center" },
+        { baslik: "İsim", genislik: "60%" },
+        { baslik: "Sayfa", genislik: "20%", hiza: "center" },
+        { baslik: "Cüz", genislik: "20%", hiza: "center" },
       ],
-      satirlar: hafizTalebeler.map((t, i) => {
-        const verilen = getDersGunler(t, seciliDers, seciliHafta);
-        return [
-          i + 1,
-          t.isim,
-          ...gunler.map((_, gi) => (verilen.includes(gi) ? "✓" : "–")),
-          t.sayfa,
-          cuzHesapla(t.sayfa),
-        ];
-      }),
+      satirlar: hafiz.map((t) => [t.isim, t.sayfa, cuzHesapla(t.sayfa)]),
     });
   };
 
-  const aidatPdf = async () => {
-    const tutar = await aidatTutariniOku();
+  const aidatAySecenekleri = (kaynak: Talebe[] = talebeler) => {
     const simdi = new Date();
-    const ayKey = `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}`;
-    const ayAdi = simdi.toLocaleDateString("tr-TR", {
-      month: "long",
-      year: "numeric",
-    });
+    const yil = simdi.getFullYear();
+    const ay = simdi.getMonth();
+
+    // Sadece en az bir ödeme kaydı bulunan ayları dikkate al
+    const kullanilanAylar = new Set<number>();
+    for (const t of kaynak) {
+      if (!t.aidat) continue;
+      for (const [key, val] of Object.entries(t.aidat)) {
+        if (!val) continue;
+        const [y, m] = key.split("-").map(Number);
+        if (y === yil && m >= 1 && m <= 12) {
+          kullanilanAylar.add(m - 1);
+        }
+      }
+    }
+
+    const enEski = kullanilanAylar.size > 0 ? Math.min(...kullanilanAylar) : ay;
+
+    const aylar: { key: string; ad: string }[] = [];
+    for (let i = ay; i >= enEski; i--) {
+      aylar.push({
+        key: `${yil}-${String(i + 1).padStart(2, "0")}`,
+        ad: new Date(yil, i, 1).toLocaleDateString("tr-TR", {
+          month: "long",
+          year: "numeric",
+        }),
+      });
+    }
+    return aylar;
+  };
+
+  const aidatPdf = async (secim: string = "buAy") => {
+    const [tutar, taze] = await Promise.all([aidatTutariniOku(), tazeListeler()]);
+    const simdi = new Date();
     const liste =
-      grupFiltre === "hepsi" ? aidatTalebeler : aidatTalebeler.filter((t) => t.grup === grupFiltre);
-    const odeyen = liste.filter((t) => t.aidat?.[ayKey]).length;
+      grupFiltre === "hepsi" ? taze.aidat : taze.aidat.filter((t) => t.grup === grupFiltre);
     const grupAdi =
       grupFiltre === "hepsi"
         ? "Tüm gruplar"
-        : (GRUPLAR.find((g) => g.id === grupFiltre)?.ad ?? "Grup");
-    await listeYazdir({
+        : (gruplar.find((g) => g.id === grupFiltre)?.ad ?? "Grup");
+    if (secim === "tumu") {
+      const aylar = aidatAySecenekleri(taze.tum).slice().reverse();
+      listeYazdir({
+        altBaslik: "Aidat Takip Listesi · Tüm Aylar",
+        bilgi: [`Grup: ${grupAdi}`, `Aylık aidat: ${tutar.toLocaleString("tr-TR")} Birr`],
+        sutunlar: [
+          { baslik: "#", genislik: "6%", hiza: "center" },
+          { baslik: "Talebe", genislik: "28%" },
+          ...aylar.map((a) => ({
+            baslik: a.ad.split(" ")[0],
+            genislik: `${66 / aylar.length}%`,
+            hiza: "center" as const,
+          })),
+        ],
+        satirlar: liste.map((t, i) => [
+          i + 1,
+          t.isim,
+          ...aylar.map((a) => (t.aidat?.[a.key] ? "✓" : "–")),
+        ]),
+      });
+      return;
+    }
+    const ayKey =
+      secim === "buAy"
+        ? `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}`
+        : secim;
+    const [yil, ayNo] = ayKey.split("-").map(Number);
+    const ayAdi = new Date(yil, ayNo - 1, 1).toLocaleDateString("tr-TR", {
+      month: "long",
+      year: "numeric",
+    });
+    const odeyen = liste.filter((t) => t.aidat?.[ayKey]).length;
+    listeYazdir({
       altBaslik: `Aidat Takip Listesi · ${ayAdi}`,
       bilgi: [
         `Grup: ${grupAdi}`,
@@ -669,33 +840,196 @@ function Index() {
   };
 
   const aidatListePdf = async () => {
-    await listeYazdir({
-      altBaslik: "Aidat Talebe Listesi",
-      bilgi: [`Toplam talebe: ${aidatTalebeler.length}`],
+    const { aidat } = await tazeListeler();
+    listeYazdir({
+      altBaslik: "Talebe Listesi",
+      bilgi: [`Toplam talebe: ${aidat.length}`],
       sutunlar: [
         { baslik: "Sıra No", genislik: "10%", hiza: "center" },
-        { baslik: "Talebe İsmi", genislik: "34%" },
-        { baslik: "Sınıf", genislik: "16%" },
-        { baslik: "Grup", genislik: "18%" },
-        { baslik: "Telefon", genislik: "22%" },
+        { baslik: "Talebe İsmi", genislik: "30%" },
+        { baslik: "Yaş", genislik: "10%", hiza: "center" },
+        { baslik: "Sınıf", genislik: "14%" },
+        { baslik: "Grup", genislik: "16%" },
+        { baslik: "Telefon", genislik: "20%" },
       ],
-      satirlar: aidatTalebeler.map((t, i) => [
+      satirlar: aidat.map((t, i) => [
         i + 1,
         t.isim,
+        yasHesapla(t.dogum) ?? "—",
         t.sinif || "—",
-        t.grup ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—") : "—",
+        t.grup ? (gruplar.find((g) => g.id === t.grup)?.ad ?? "—") : "—",
         t.telefon || "—",
       ]),
     });
   };
 
+  const aidatListeExcel = async () => {
+    const { aidat } = await tazeListeler();
+    excelIndir(
+      "aidat-talebe-listesi",
+      "Talebe Listesi",
+      [
+        { baslik: "Sıra No", genislik: 8 },
+        { baslik: "Talebe İsmi", genislik: 28 },
+        { baslik: "Yaş", genislik: 8 },
+        { baslik: "Sınıf", genislik: 14 },
+        { baslik: "Grup", genislik: 16 },
+        { baslik: "Telefon", genislik: 18 },
+      ],
+      aidat.map((t, i) => [
+        i + 1,
+        t.isim,
+        yasHesapla(t.dogum) ?? "—",
+        t.sinif || "—",
+        t.grup ? (gruplar.find((g) => g.id === t.grup)?.ad ?? "—") : "—",
+        t.telefon || "—",
+      ]),
+    );
+  };
+
+  const aidatListeSadeceIsimPdf = async () => {
+    const { aidat } = await tazeListeler();
+    listeYazdir({
+      altBaslik: "Talebe İsim Listesi",
+      bilgi: [`Toplam talebe: ${aidat.length}`],
+      sutunlar: [
+        { baslik: "Sıra No", genislik: "15%", hiza: "center" },
+        { baslik: "Talebe İsmi", genislik: "85%" },
+      ],
+      satirlar: aidat.map((t, i) => [i + 1, t.isim]),
+      tekSayfa: true,
+    });
+  };
+
+  const aidatListeSadeceIsimExcel = async () => {
+    const { aidat } = await tazeListeler();
+    excelIndir(
+      "aidat-talebe-listesi-sadece-isimler",
+      "Talebe İsim Listesi",
+      [
+        { baslik: "Sıra No", genislik: 12 },
+        { baslik: "Talebe İsmi", genislik: 40 },
+      ],
+      aidat.map((t, i) => [i + 1, t.isim]),
+    );
+  };
+
+  const aidatExcel = async (secim: string = "buAy") => {
+    const [tutar, taze] = await Promise.all([aidatTutariniOku(), tazeListeler()]);
+    const simdi = new Date();
+    const liste =
+      grupFiltre === "hepsi" ? taze.aidat : taze.aidat.filter((t) => t.grup === grupFiltre);
+    if (secim === "tumu") {
+      const aylar = aidatAySecenekleri(taze.tum).slice().reverse();
+      excelIndir(
+        "aidat-takip-tum-aylar",
+        "Aidat Takip",
+        [
+          { baslik: "#", genislik: 6 },
+          { baslik: "Talebe", genislik: 28 },
+          ...aylar.map((a) => ({ baslik: a.ad, genislik: 14 })),
+        ],
+        liste.map((t, i) => [
+          i + 1,
+          t.isim,
+          ...aylar.map((a) => (t.aidat?.[a.key] ? "Ödedi" : "Ödemedi")),
+        ]),
+      );
+      return;
+    }
+    const ayKey =
+      secim === "buAy"
+        ? `${simdi.getFullYear()}-${String(simdi.getMonth() + 1).padStart(2, "0")}`
+        : secim;
+    excelIndir(
+      `aidat-takip-${ayKey}`,
+      "Aidat Takip",
+      [
+        { baslik: "#", genislik: 6 },
+        { baslik: "Talebe", genislik: 28 },
+        { baslik: "Tutar (Birr)", genislik: 14 },
+        { baslik: "Durum", genislik: 12 },
+      ],
+      liste.map((t, i) => [i + 1, t.isim, tutar, t.aidat?.[ayKey] ? "Ödedi" : "Ödemedi"]),
+    );
+  };
+
+  const aidatListeIceAktar = async (dosya: File) => {
+    try {
+      const satirlar = await excelOku(dosya);
+      if (satirlar.length === 0) {
+        toast.error("Excel dosyasında satır bulunamadı.");
+        return;
+      }
+      const al = (r: Record<string, string>, ...adlar: string[]) => {
+        for (const a of adlar) {
+          const k = Object.keys(r).find(
+            (x) => x.toLocaleLowerCase("tr") === a.toLocaleLowerCase("tr"),
+          );
+          if (k && r[k] !== "" && r[k] !== "—") return r[k];
+        }
+        return "";
+      };
+      let guncellenen = 0;
+      let eklenen = 0;
+      let enBuyukSira = talebeler.reduce((m, t) => Math.max(m, t.sira ?? 0), 0);
+
+      for (const r of satirlar) {
+        const isim = al(r, "Talebe İsmi", "Talebe", "İsim", "Isim");
+        if (!isim) continue;
+        const sinif = al(r, "Sınıf", "Sinif");
+        const telefon = al(r, "Telefon");
+        const grupAd = al(r, "Grup");
+        const grup = gruplar.find(
+          (g) => g.ad.toLocaleLowerCase("tr") === grupAd.toLocaleLowerCase("tr") || g.id === grupAd,
+        )?.id;
+
+        const mevcut = talebeler.find(
+          (t) => t.isim.trim().toLocaleLowerCase("tr") === isim.toLocaleLowerCase("tr"),
+        );
+
+        const patch: Record<string, unknown> = {};
+        if (sinif) patch.sinif = sinif;
+        if (telefon) patch.telefon = telefon;
+        if (grup) patch.grup = grup;
+
+        if (mevcut) {
+          if (Object.keys(patch).length > 0) {
+            await talebeGuncelle(mevcut.id, patch);
+            guncellenen++;
+          }
+        } else {
+          enBuyukSira++;
+          await talebeEkle({
+            isim,
+            kiraat: false,
+            sayfa: 1,
+            gecmis: [{ t: Date.now(), sayfa: 1 }],
+            sira: enBuyukSira,
+            yon: "alttan",
+            fikihKonu: 1,
+            hadisNo: 1,
+            aidatSadece: true,
+            aidatHaric: false,
+            ...patch,
+          });
+          eklenen++;
+        }
+      }
+      toast.success(`Excel içe aktarıldı · ${guncellenen} güncellendi, ${eklenen} yeni talebe`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Excel dosyası okunamadı.");
+    }
+  };
+
   return (
     <DilContext.Provider value={dil}>
       <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-6xl px-2 py-4 sm:px-6 sm:py-12">
+        <div className="mx-auto flex min-h-screen w-full max-w-none flex-col px-2 py-4 sm:px-6 sm:py-8">
           <header className="relative mb-6 flex flex-col items-center gap-3 text-center sm:mb-12 sm:gap-5">
             <div className="absolute left-0 top-0 flex items-center gap-2">
-              <DropdownMenu>
+              <DropdownMenu open={menuAcik} onOpenChange={setMenuAcik}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
@@ -712,7 +1046,7 @@ function Index() {
                   {(
                     [
                       ["hafizlik", "Hafızlık takip paneli"],
-                      ["aidat", "Aidat takip paneli"],
+                      ["aidat", "Aidat Listesi"],
                     ] as const
                   ).map(([k, etiket]) => (
                     <DropdownMenuItem
@@ -734,38 +1068,62 @@ function Index() {
                     }}
                     className={aidatListeAcik ? "font-semibold text-primary" : ""}
                   >
-                    Aidat Talebe Listesi
+                    Talebe Listesi
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel>Gruplar</DropdownMenuLabel>
-                  {(
-                    [
-                      ["seviye1", "1. Seviye"],
-                      ["seviye2", "2. Seviye"],
-                      ["hazirlik", "Hazırlık"],
-                    ] as const
-                  ).map(([k, etiket]) => (
-                    <DropdownMenuItem
-                      key={k}
-                      onSelect={() => {
-                        setSekme("aidat");
-                        setAidatListeAcik(false);
-                        setGrupFiltre(k as Grup | "hepsi");
-                      }}
-                      className={
-                        !aidatListeAcik && sekme === "aidat" && grupFiltre === k
-                          ? "font-semibold text-primary"
-                          : ""
-                      }
-                    >
-                      {etiket}
-                    </DropdownMenuItem>
-                  ))}
+                  {gruplar.map((g) => {
+                    const k = g.id;
+                    const etiket = g.ad;
+                    return (
+                      <DropdownMenuItem
+                        key={k}
+                        onSelect={() => {
+                          setSekme("aidat");
+                          setAidatListeAcik(false);
+                          setGrupFiltre(k as Grup | "hepsi");
+                        }}
+                        className={
+                          !aidatListeAcik && sekme === "aidat" && grupFiltre === k
+                            ? "font-semibold text-primary"
+                            : ""
+                        }
+                      >
+                        {etiket}
+                      </DropdownMenuItem>
+                    );
+                  })}
                   {hocaModu && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel>Yönetim</DropdownMenuLabel>
-                      <DropdownMenuItem onSelect={() => setAyarlarAcik(true)}>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          menudenAcildi.current = true;
+                          setAyarlarAcik(false);
+                          setGrupTaslak(gruplar.map((g) => ({ ...g })));
+                          setGruplarAcik(true);
+                        }}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Grupları düzenle
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          menudenAcildi.current = true;
+                          setMailAcik(true);
+                        }}
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        Aidat Hatırlatma E-postası
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          menudenAcildi.current = true;
+                          setAyarlarAcik(true);
+                        }}
+                      >
                         <Settings className="mr-2 h-4 w-4" />
                         {tr("ayarlar")}
                       </DropdownMenuItem>
@@ -775,7 +1133,7 @@ function Index() {
               </DropdownMenu>
               <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
                 {aidatListeAcik
-                  ? "Aidat Talebe Listesi"
+                  ? "Talebe Listesi"
                   : sekme === "aidat"
                     ? tr("altBaslikAidat")
                     : tr("altBaslikHafizlik")}
@@ -790,7 +1148,7 @@ function Index() {
               </h1>
               <p className="mt-2 text-base text-muted-foreground sm:text-xl">
                 {aidatListeAcik
-                  ? "Aidat Talebe Listesi"
+                  ? "Talebe Listesi"
                   : sekme === "aidat"
                     ? tr("altBaslikAidat")
                     : tr("altBaslikHafizlik")}
@@ -864,51 +1222,48 @@ function Index() {
             </CardContent>
           </Card>
 
+          <div className="flex flex-1 flex-col">
           {sekme === "aidat" ? (
             aidatListeAcik ? (
               <>
                 <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-base font-semibold text-foreground sm:text-lg">
-                    Aidat Talebe Listesi
+                    Talebe Listesi
                   </h2>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => aidatListePdf()}
-                    className="gap-1.5 text-xs sm:text-sm"
-                  >
-                    <FileDown className="h-4 w-4" /> PDF İndir
-                  </Button>
                 </div>
-                <Card className="overflow-hidden">
+                <Card className="flex flex-1 flex-col overflow-hidden">
                   <div className="overflow-x-auto">
                     <Table className="table-fixed min-w-[540px]">
                       <colgroup>
-                        <col className="w-[8%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[30%]" />
+                        <col className="w-[6%]" />
+                        <col className="w-[9%]" />
+                        <col className="w-[23%]" />
                         <col className="w-[15%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[16%]" />
                         <col className="w-[17%]" />
-                        <col className="w-[18%]" />
                       </colgroup>
                       <TableHeader>
                         <TableRow className="bg-muted/40">
-                          <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-center text-[11px] sm:px-3 sm:text-sm">
                             #
                           </TableHead>
-                          <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-center text-[11px] sm:px-3 sm:text-sm">
                             Profil
                           </TableHead>
-                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-left text-[11px] sm:px-3 sm:text-sm">
                             İsim
                           </TableHead>
-                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-center text-[11px] sm:px-3 sm:text-sm">
+                            Yaş
+                          </TableHead>
+                          <TableHead className="px-1 py-2 text-left text-[11px] sm:px-3 sm:text-sm">
                             Sınıf
                           </TableHead>
-                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-left text-[11px] sm:px-3 sm:text-sm">
                             Grup
                           </TableHead>
-                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                          <TableHead className="px-1 py-2 text-left text-[11px] sm:px-3 sm:text-sm">
                             Telefon
                           </TableHead>
                         </TableRow>
@@ -919,25 +1274,27 @@ function Index() {
                             <TableCell className="px-1 py-2 text-center text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                               {i + 1}
                             </TableCell>
-                            <TableCell className="px-1 py-2 sm:px-3 sm:py-3">
+                            <TableCell className="px-1 py-2 text-center sm:px-3 sm:py-3">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setProfilAidattan(true);
+                                  setProfilDetayli(true);
                                   setProfilGoster(t);
                                 }}
-                                className="flex w-full justify-center"
+                                className="inline-flex items-center justify-center"
                               >
                                 <span className="shrink-0 scale-90 sm:scale-100">
                                   <TalebeAvatar talebe={t} boyut={36} />
                                 </span>
                               </button>
                             </TableCell>
-                            <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-3 sm:py-3">
+                            <TableCell className="min-w-0 px-1 py-2 text-left font-medium sm:px-3 sm:py-3">
                               <button
                                 type="button"
                                 onClick={() => {
                                   setProfilAidattan(true);
+                                  setProfilDetayli(true);
                                   setProfilGoster(t);
                                 }}
                                 className="block w-full min-w-0 truncate text-left text-[11px] hover:text-primary hover:underline sm:text-sm"
@@ -945,15 +1302,18 @@ function Index() {
                                 {t.isim}
                               </button>
                             </TableCell>
-                            <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                            <TableCell className="px-1 py-2 text-center text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                              {yasHesapla(t.dogum) ?? "—"}
+                            </TableCell>
+                            <TableCell className="min-w-0 px-1 py-2 text-left text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                               <span className="block truncate">{t.sinif || "—"}</span>
                             </TableCell>
-                            <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                            <TableCell className="min-w-0 px-1 py-2 text-left text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                               <span className="block truncate">
-                                {t.grup ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—") : "—"}
+                                {t.grup ? (gruplar.find((g) => g.id === t.grup)?.ad ?? "—") : "—"}
                               </span>
                             </TableCell>
-                            <TableCell className="min-w-0 px-1 py-2 text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                            <TableCell className="min-w-0 px-1 py-2 text-left text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
                               {t.telefon ? (
                                 <a
                                   href={`tel:${t.telefon.replace(/\s+/g, "")}`}
@@ -970,7 +1330,7 @@ function Index() {
                         {aidatTalebeler.length === 0 && (
                           <TableRow>
                             <TableCell
-                              colSpan={6}
+                              colSpan={7}
                               className="py-10 text-center text-sm text-muted-foreground"
                             >
                               Henüz aidat kaydı olan talebe yok.
@@ -983,23 +1343,22 @@ function Index() {
                 </Card>
               </>
             ) : (
+              <div className="flex flex-1 flex-col">
               <Suspense
-                fallback={
-                  <div className="py-10 text-center text-sm text-muted-foreground">
-                    Yükleniyor…
-                  </div>
-                }
+                fallback={<div className="p-6 text-sm text-muted-foreground">Yükleniyor…</div>}
               >
                 <AidatPanel
                   talebeler={aidatTalebeler}
                   hocaModu={hocaModu}
                   onTalebe={(t) => {
                     setProfilAidattan(true);
+                    setProfilDetayli(false);
                     setProfilGoster(t);
                   }}
                   grupFiltre={grupFiltre}
                 />
               </Suspense>
+              </div>
             )
           ) : (
             <>
@@ -1012,11 +1371,6 @@ function Index() {
                 />
               </div>
 
-              <div className="mb-6 flex justify-end">
-                <Button size="sm" variant="outline" onClick={() => setRaporAcik(true)}>
-                  <CalendarDays className="h-4 w-4" /> {tr("haftaninRaporu")}
-                </Button>
-              </div>
 
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/30 px-3 py-2">
                 <div className="flex items-center gap-2 text-sm">
@@ -1057,7 +1411,7 @@ function Index() {
                 </div>
               </div>
 
-              <Card className="overflow-hidden">
+              <Card className="flex flex-1 flex-col overflow-hidden">
                 <Table className="table-fixed">
                   <colgroup>
                     <col className="w-[6%]" />
@@ -1121,6 +1475,7 @@ function Index() {
                               type="button"
                               onClick={() => {
                                 setProfilAidattan(false);
+                                setProfilDetayli(false);
                                 setProfilGoster(t);
                               }}
                               className="group flex w-full min-w-0 items-center gap-1 text-left text-xs hover:text-primary sm:gap-2 sm:text-sm"
@@ -1209,6 +1564,7 @@ function Index() {
               </Card>
             </>
           )}
+          </div>
         </div>
 
         <VermediDiyalog
@@ -1221,19 +1577,24 @@ function Index() {
           onTalebe={(t) => {
             setVermediAcik(false);
             setProfilAidattan(false);
+            setProfilDetayli(false);
             setProfilGoster(t);
           }}
         />
 
         <RaporDiyalog
           acik={raporAcik}
-          onClose={() => setRaporAcik(false)}
+          onClose={() => {
+            setRaporAcik(false);
+            ayarlaraDon();
+          }}
           talebeler={hafizTalebeler}
           haftaBas={seciliHafta}
           haftaEtiketi={haftaEtiket(seciliHafta)}
           onTalebe={(t) => {
             setRaporAcik(false);
             setProfilAidattan(false);
+            setProfilDetayli(false);
             setProfilGoster(t);
           }}
         />
@@ -1276,17 +1637,33 @@ function Index() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={ayarlarAcik} onOpenChange={setAyarlarAcik}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader>
+        <Dialog open={mailAcik} onOpenChange={panelKapat(setMailAcik)}>
+          <DialogContent className="flex h-dvh max-h-none w-full max-w-full flex-col gap-3 rounded-none border-0 p-4 sm:p-6">
+            <DialogHeader className="shrink-0">
+              <DialogTitle>E-posta Merkezi</DialogTitle>
+            </DialogHeader>
+            <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 py-1">
+              <Suspense
+                fallback={<div className="p-6 text-sm text-muted-foreground">Yükleniyor…</div>}
+              >
+                <AidatHatirlatma talebeler={talebeler} />
+              </Suspense>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={ayarlarAcik} onOpenChange={panelKapat(setAyarlarAcik)}>
+          <DialogContent className="flex h-dvh max-h-none w-full max-w-full flex-col gap-3 rounded-none border-0 p-4 sm:p-6">
+            <DialogHeader className="shrink-0">
               <DialogTitle>{tr("ayarlar")}</DialogTitle>
               <DialogDescription>{tr("ayarlarAciklama")}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-2">
+            <div className="-mx-1 min-h-0 flex-1 space-y-2 overflow-y-auto px-1 py-1">
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                 onClick={() => {
+                  ayarlardanAcildi.current = true;
                   setAyarlarAcik(false);
                   setEskiParola("");
                   setYeniParola("");
@@ -1302,41 +1679,154 @@ function Index() {
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                 onClick={() => {
+                  ayarlardanAcildi.current = true;
                   setAyarlarAcik(false);
-                  setTimeout(() => hafizlikPdf(), 150);
+                  setRaporAcik(true);
+                }}
+              >
+                <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{tr("haftaninRaporu")}</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                onClick={() => {
+                  setAyarlarAcik(false);
+                  setTimeout(() => {
+                    void hafizlikPdf().finally(() => setAyarlarAcik(true));
+                  }, 150);
                 }}
               >
                 <FileDown className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Hafızlık Listesini PDF İndir</span>
               </button>
+              <div className="rounded-md border border-border/60 px-3 py-2">
+                <Label className="mb-1 block text-xs text-muted-foreground">
+                  Aidat listesi için ay seç
+                </Label>
+                <Select value={aidatIndirAy} onValueChange={setAidatIndirAy}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="buAy">Bu ay</SelectItem>
+                    <SelectItem value="tumu">Tüm aylar</SelectItem>
+                    {aidatAySecenekleri().map((a) => (
+                      <SelectItem key={a.key} value={a.key}>
+                        {a.ad}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  className="flex h-full flex-col items-center justify-center gap-1 rounded-md border border-border/60 px-1 py-2 text-center transition-colors hover:bg-accent"
+                  onClick={() => {
+                    const secim = aidatIndirAy;
+                    setAyarlarAcik(false);
+                    setTimeout(() => {
+                      void aidatPdf(secim).finally(() => setAyarlarAcik(true));
+                    }, 150);
+                  }}
+                >
+                  <FileDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-[10px] font-medium leading-tight">Aidat Listesi PDF</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex h-full flex-col items-center justify-center gap-1 rounded-md border border-border/60 px-1 py-2 text-center transition-colors hover:bg-accent"
+                  onClick={() => {
+                    const secim = aidatIndirAy;
+                    setAyarlarAcik(false);
+                    setTimeout(() => {
+                      void aidatExcel(secim).finally(() => setAyarlarAcik(true));
+                    }, 150);
+                  }}
+                >
+                  <FileDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-[10px] font-medium leading-tight">Aidat Listesi Excel</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex h-full flex-col items-center justify-center gap-1 rounded-md border border-border/60 px-1 py-2 text-center transition-colors hover:bg-accent"
+                  onClick={() => {
+                    setAyarlarAcik(false);
+                    setTimeout(() => {
+                      void aidatListePdf().finally(() => setAyarlarAcik(true));
+                    }, 150);
+                  }}
+                >
+                  <FileDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-[10px] font-medium leading-tight">Talebe Listesi PDF</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex h-full flex-col items-center justify-center gap-1 rounded-md border border-border/60 px-1 py-2 text-center transition-colors hover:bg-accent"
+                  onClick={() => {
+                    setAyarlarAcik(false);
+                    setTimeout(() => {
+                      void aidatListeExcel().finally(() => setAyarlarAcik(true));
+                    }, 150);
+                  }}
+                >
+                  <FileDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="text-[10px] font-medium leading-tight">
+                    Talebe Listesi Excel
+                  </span>
+                </button>
+              </div>
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                 onClick={() => {
                   setAyarlarAcik(false);
-                  setTimeout(() => void aidatPdf(), 150);
+                  setTimeout(() => {
+                    void aidatListeSadeceIsimPdf().finally(() => setAyarlarAcik(true));
+                  }, 150);
                 }}
               >
                 <FileDown className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Aidat Listesini PDF İndir</span>
+                <span className="text-sm font-medium">Talebe İsim Listesi PDF İndir</span>
               </button>
               <button
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                 onClick={() => {
                   setAyarlarAcik(false);
-                  setTimeout(() => aidatListePdf(), 150);
+                  setTimeout(() => {
+                    void aidatListeSadeceIsimExcel().finally(() => setAyarlarAcik(true));
+                  }, 150);
                 }}
               >
                 <FileDown className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Aidat Talebe Listesi PDF İndir</span>
+                <span className="text-sm font-medium">Talebe İsim Listesi Excel İndir</span>
               </button>
               {hocaModu && (
                 <>
+                  <label className="flex w-full cursor-pointer items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent">
+                    <FileDown className="h-4 w-4 rotate-180 text-muted-foreground" />
+                    <span className="text-sm font-medium">Talebe Listesi Excel Yükle</span>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) {
+                          setAyarlarAcik(false);
+                          void aidatListeIceAktar(f);
+                        }
+                      }}
+                    />
+                  </label>
                   <button
                     type="button"
                     className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                     onClick={() => {
+                      ayarlardanAcildi.current = true;
                       setAyarlarAcik(false);
                       ekle(false);
                     }}
@@ -1348,18 +1838,21 @@ function Index() {
                     type="button"
                     className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                     onClick={() => {
+                      ayarlardanAcildi.current = true;
                       setAyarlarAcik(false);
                       ekle(true);
                     }}
                   >
                     <Wallet className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Aidata talebe ekle</span>
+                    <span className="text-sm font-medium">Yeni Talebe Ekle</span>
                   </button>
                   <button
                     type="button"
                     className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                     onClick={() => {
+                      ayarlardanAcildi.current = true;
                       setAyarlarAcik(false);
+                      setGrupTaslak(gruplar.map((g) => ({ ...g })));
                       setGruplarAcik(true);
                     }}
                   >
@@ -1369,8 +1862,12 @@ function Index() {
                 </>
               )}
             </div>
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setAyarlarAcik(false)}>
+            <DialogFooter className="shrink-0 sm:justify-between">
+              <Button variant="outline" className="gap-2" onClick={ayarlarKapat}>
+                <ArrowLeft className="h-4 w-4" />
+                Geri dön
+              </Button>
+              <Button variant="ghost" onClick={ayarlarKapat}>
                 {tr("kapat")}
               </Button>
             </DialogFooter>
@@ -1386,6 +1883,7 @@ function Index() {
               setYeniParola("");
               setYeniParolaTekrar("");
               setParolaDegistirHata(null);
+              ayarlaraDon();
             }
           }}
         >
@@ -1431,7 +1929,13 @@ function Index() {
               )}
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setParolaDegistirAcik(false)}>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setParolaDegistirAcik(false);
+                  ayarlaraDon();
+                }}
+              >
                 {tr("iptal")}
               </Button>
               <Button onClick={parolaDegistir}>{tr("degistir")}</Button>
@@ -1439,12 +1943,94 @@ function Index() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={gruplarAcik} onOpenChange={setGruplarAcik}>
-          <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+        <Dialog
+          open={gruplarAcik}
+          onOpenChange={(acik) => {
+            panelKapat(setGruplarAcik)(acik);
+            setGrupTaslak(acik ? gruplar.map((g) => ({ ...g })) : null);
+          }}
+        >
+          <DialogContent className="flex h-dvh max-h-none w-full max-w-full flex-col gap-3 overflow-y-auto rounded-none border-0 p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle>Gruplar oluştur</DialogTitle>
-              <DialogDescription>Talebeleri gruplara atayın.</DialogDescription>
+              <DialogTitle>Gruplar</DialogTitle>
+              <DialogDescription>
+                Grup adlarını ve mesul hocaları düzenleyin, talebeleri gruplara atayın.
+              </DialogDescription>
             </DialogHeader>
+
+            {hocaModu && grupTaslak && (
+              <div className="space-y-2 rounded-md border border-border/60 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Grup adı ve mesul hoca</p>
+                {grupTaslak.map((g, i) => (
+                  <div key={g.id} className="flex items-center gap-2">
+                    <Input
+                      value={g.ad}
+                      aria-label="Grup adı"
+                      placeholder="Grup adı"
+                      className="h-9 flex-1"
+                      onChange={(e) =>
+                        setGrupTaslak((t) =>
+                          t ? t.map((x, j) => (j === i ? { ...x, ad: e.target.value } : x)) : t,
+                        )
+                      }
+                    />
+                    <Input
+                      value={g.hoca}
+                      aria-label="Mesul hoca"
+                      placeholder="Mesul hoca"
+                      className="h-9 flex-1"
+                      onChange={(e) =>
+                        setGrupTaslak((t) =>
+                          t ? t.map((x, j) => (j === i ? { ...x, hoca: e.target.value } : x)) : t,
+                        )
+                      }
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Grubu sil"
+                      className="h-9 w-9 shrink-0 text-destructive"
+                      onClick={() => setGrupTaslak((t) => (t ? t.filter((_, j) => j !== i) : t))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() =>
+                    setGrupTaslak((t) => [...(t ?? []), { id: yeniGrupId(), ad: "", hoca: "" }])
+                  }
+                >
+                  <Plus className="h-4 w-4" />
+                  Yeni grup ekle
+                </Button>
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={() => {
+                    const temiz = grupTaslak
+                      .map((g) => ({
+                        id: g.id,
+                        ad: g.ad.trim(),
+                        hoca: g.hoca.trim(),
+                      }))
+                      .filter((g) => g.ad);
+                    if (temiz.length !== grupTaslak.length) {
+                      toast.error("Grup adı boş olamaz.");
+                      return;
+                    }
+                    void gruplariKaydet(temiz)
+                      .then(() => toast.success("Grup bilgileri kaydedildi."))
+                      .catch(() => toast.error("Grup bilgileri kaydedilemedi."));
+                  }}
+                >
+                  Grup bilgilerini kaydet
+                </Button>
+              </div>
+            )}
             <div className="space-y-2">
               {talebeler
                 .filter((t) => !t.aidatHaric)
@@ -1456,14 +2042,12 @@ function Index() {
                         value={t.grup ?? ""}
                         onChange={(e) => {
                           const yeni = e.target.value as Grup | "";
-                          void talebeGuncelle(t.id, {
-                            grup: yeni === "" ? undefined : yeni,
-                          });
+                          void talebeGuncelle(t.id, { grup: yeni });
                         }}
                         className="h-9 shrink-0 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                       >
                         <option value="">Grup yok</option>
-                        {GRUPLAR.map((g) => (
+                        {gruplar.map((g) => (
                           <option key={g.id} value={g.id}>
                             {g.ad}
                           </option>
@@ -1477,7 +2061,7 @@ function Index() {
               )}
             </div>
             <DialogFooter>
-              <Button onClick={() => setGruplarAcik(false)}>Kapat</Button>
+              <Button onClick={gruplarKapat}>Kapat</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1497,12 +2081,146 @@ function Index() {
           }}
         />
 
+        <Dialog
+          open={yeniTalebeAcik !== null}
+          onOpenChange={(o) => {
+            if (!o) {
+              setYeniTalebeAcik(null);
+              ayarlaraDon();
+            }
+          }}
+        >
+          <DialogContent className="flex h-dvh max-h-none w-full max-w-full flex-col gap-3 overflow-y-auto rounded-none border-0 p-4 sm:p-6">
+            <DialogHeader>
+              <DialogTitle>
+                {yeniTalebeAcik === "aidat" ? "Yeni Talebe Ekle" : tr("talebeEkle")}
+              </DialogTitle>
+              <DialogDescription>
+                {yeniTalebeAcik === "hafiz"
+                  ? "Talebenin ismini yazıp ekleyin."
+                  : "Talebenin bilgilerini doldurun, ardından ekleyin."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="yt-isim">İsim *</Label>
+                <Input
+                  id="yt-isim"
+                  value={yeniTalebe.isim}
+                  onChange={(e) =>
+                    setYeniTalebe((p) => ({ ...p, isim: e.target.value.slice(0, 60) }))
+                  }
+                  maxLength={60}
+                  placeholder="Talebenin adı"
+                  autoFocus
+                />
+              </div>
+
+              {yeniTalebeAcik === "aidat" && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="yt-dogum">Yaşı / Doğum tarihi</Label>
+                      <Input
+                        id="yt-dogum"
+                        type="date"
+                        value={yeniTalebe.dogum}
+                        onChange={(e) => setYeniTalebe((p) => ({ ...p, dogum: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="yt-sinif">Sınıfı</Label>
+                      <Input
+                        id="yt-sinif"
+                        value={yeniTalebe.sinif}
+                        onChange={(e) =>
+                          setYeniTalebe((p) => ({ ...p, sinif: e.target.value.slice(0, 30) }))
+                        }
+                        maxLength={30}
+                        placeholder="Örn. 5. sınıf"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="yt-telefon">Telefon numarası</Label>
+                    <Input
+                      id="yt-telefon"
+                      type="tel"
+                      inputMode="tel"
+                      value={yeniTalebe.telefon}
+                      onChange={(e) =>
+                        setYeniTalebe((p) => ({ ...p, telefon: e.target.value.slice(0, 20) }))
+                      }
+                      maxLength={20}
+                      placeholder="+251 ..."
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Grubu</Label>
+                    <Select
+                      value={yeniTalebe.grup || "yok"}
+                      onValueChange={(v) =>
+                        setYeniTalebe((p) => ({ ...p, grup: v === "yok" ? "" : v }))
+                      }
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yok">Grup yok</SelectItem>
+                        {gruplar.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.ad}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="yt-notlar">Notlar</Label>
+                    <Textarea
+                      id="yt-notlar"
+                      value={yeniTalebe.notlar}
+                      onChange={(e) =>
+                        setYeniTalebe((p) => ({ ...p, notlar: e.target.value.slice(0, 500) }))
+                      }
+                      maxLength={500}
+                      rows={3}
+                      placeholder="Eklemek istediğiniz notlar..."
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setYeniTalebeAcik(null);
+                  ayarlaraDon();
+                }}
+              >
+                İptal
+              </Button>
+              <Button onClick={yeniTalebeKaydet} disabled={!yeniTalebe.isim.trim()}>
+                Ekle
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <ProfilDiyalog
           talebe={
             profilGoster ? (talebeler.find((x) => x.id === profilGoster.id) ?? profilGoster) : null
           }
           hocaModu={hocaModu}
           kiraatGizli={profilAidattan}
+          detayliAlanlar={profilDetayli}
           onClose={() => setProfilGoster(null)}
           onDuzenle={(t) => {
             setProfilGoster(null);
@@ -1557,6 +2275,7 @@ function ProfilDiyalog({
   talebe,
   hocaModu,
   kiraatGizli = false,
+  detayliAlanlar = false,
   onClose,
   onDuzenle,
   onFotoDegistir,
@@ -1566,12 +2285,13 @@ function ProfilDiyalog({
   talebe: Talebe | null;
   hocaModu: boolean;
   kiraatGizli?: boolean;
+  detayliAlanlar?: boolean;
   onClose: () => void;
   onDuzenle: (t: Talebe) => void;
   onFotoDegistir: (t: Talebe, fotoUrl: string) => void;
   onNotKaydet: (
     t: Talebe,
-    patch: Partial<Pick<Talebe, "telefon" | "notlar" | "isim" | "sinif">>,
+    patch: Partial<Pick<Talebe, "telefon" | "notlar" | "isim" | "sinif" | "dogum">>,
   ) => void;
   onSil: () => void;
 }) {
@@ -1580,6 +2300,7 @@ function ProfilDiyalog({
   const [hata, setHata] = useState<string | null>(null);
   const [telefon, setTelefon] = useState("");
   const [sinif, setSinif] = useState("");
+  const [dogum, setDogum] = useState("");
   const [notlar, setNotlar] = useState("");
   const [fotoBuyuk, setFotoBuyuk] = useState(false);
   const [isimDuzenle, setIsimDuzenle] = useState(false);
@@ -1590,6 +2311,7 @@ function ProfilDiyalog({
     if (talebe) {
       setTelefon(talebe.telefon ?? "");
       setSinif(talebe.sinif ?? "");
+      setDogum(talebe.dogum ?? "");
       setNotlar(talebe.notlar ?? "");
       setHata(null);
       setIsimDuzenle(false);
@@ -1616,7 +2338,7 @@ function ProfilDiyalog({
   return (
     <>
       <Dialog open={!!talebe} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="fixed flex max-h-[94dvh] w-[95vw] max-w-[95vw] flex-col overflow-hidden p-0 sm:max-w-md">
+        <DialogContent className="flex max-h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-2xl p-0">
           {hocaModu && (
             <Button
               size="icon"
@@ -1761,53 +2483,105 @@ function ProfilDiyalog({
               {hata && <p className="text-xs text-destructive">{hata}</p>}
             </div>
 
-            <div className="mt-1 space-y-2">
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5 text-sm">Sınıf</Label>
-                <Input
-                  value={sinif}
-                  onChange={(e) => setSinif(e.target.value.slice(0, 40))}
-                  disabled={!hocaModu}
-                  placeholder="—"
-                  className="text-base"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5 text-sm">
-                  <Phone className="h-3.5 w-3.5" /> {t("telefon")}
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={telefon}
-                    onChange={(e) => setTelefon(e.target.value.slice(0, 30))}
-                    disabled={!hocaModu}
-                    placeholder="—"
-                    inputMode="tel"
-                    type="tel"
-                    className="text-base"
+            {!kiraatGizli && (
+              <div className="mx-auto mt-4 w-full max-w-sm rounded-2xl border bg-muted/40 p-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{t("hafizlikIlerlemesi")}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    %{Math.min(100, Math.max(0, Math.round((talebe.sayfa / 604) * 100)))}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, Math.round((talebe.sayfa / 604) * 100)))}%`,
+                    }}
                   />
-                  {telefon.trim() && (
-                    <Button asChild size="icon" variant="outline" title={t("ara")}>
-                      <a href={`tel:${telefon.replace(/\s+/g, "")}`}>
-                        <Phone className="h-4 w-4" />
-                      </a>
-                    </Button>
-                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium tabular-nums text-primary">
+                    {t("sayfa")} {talebe.sayfa} / 604
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium tabular-nums text-primary">
+                    {cuzHesapla(talebe.sayfa)}
+                    {t("cuzTam")} / 30
+                  </span>
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-1.5 text-sm">
-                  <StickyNote className="h-3.5 w-3.5" /> {t("notlar")}
-                </Label>
-                <Textarea
-                  value={notlar}
-                  onChange={(e) => setNotlar(e.target.value.slice(0, 600))}
-                  disabled={!hocaModu}
-                  rows={2}
-                  placeholder="—"
-                  className="text-base sm:min-h-[84px]"
-                />
-              </div>
+            )}
+
+            <div className="mt-1 space-y-2">
+              {detayliAlanlar && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-sm">
+                      <GraduationCap className="h-3.5 w-3.5" /> {t("sinif")}
+                    </Label>
+                    <Input
+                      value={sinif}
+                      onChange={(e) => setSinif(e.target.value.slice(0, 40))}
+                      disabled={!hocaModu}
+                      placeholder="—"
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-sm">
+                      <CalendarDays className="h-3.5 w-3.5" /> {t("dogumTarihi")}
+                    </Label>
+                    <Input
+                      type="date"
+                      value={dogum}
+                      onChange={(e) => setDogum(e.target.value)}
+                      disabled={!hocaModu}
+                      className="text-base"
+                    />
+                  </div>
+                </div>
+              )}
+
+
+              {detayliAlanlar && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-sm">
+                      <Phone className="h-3.5 w-3.5" /> {t("telefon")}
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={telefon}
+                        onChange={(e) => setTelefon(e.target.value.slice(0, 30))}
+                        disabled={!hocaModu}
+                        placeholder="—"
+                        inputMode="tel"
+                        type="tel"
+                        className="text-base"
+                      />
+                      {telefon.trim() && (
+                        <Button asChild size="icon" variant="outline" title={t("ara")}>
+                          <a href={`tel:${telefon.replace(/\s+/g, "")}`}>
+                            <Phone className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="flex items-center gap-1.5 text-sm">
+                      <StickyNote className="h-3.5 w-3.5" /> {t("notlar")}
+                    </Label>
+                    <Textarea
+                      value={notlar}
+                      onChange={(e) => setNotlar(e.target.value.slice(0, 600))}
+                      disabled={!hocaModu}
+                      rows={2}
+                      placeholder="—"
+                      className="text-base sm:min-h-[84px]"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -1819,11 +2593,17 @@ function ProfilDiyalog({
               {hocaModu && (
                 <Button
                   onClick={() => {
-                    onNotKaydet(talebe, {
-                      telefon: telefon.trim(),
-                      sinif: sinif.trim(),
-                      notlar: notlar.trim(),
-                    });
+                    onNotKaydet(
+                      talebe,
+                      detayliAlanlar
+                        ? {
+                            telefon: telefon.trim(),
+                            sinif: sinif.trim(),
+                            dogum: dogum || "",
+                            notlar: notlar.trim(),
+                          }
+                        : {},
+                    );
                     onClose();
                   }}
                 >
@@ -2035,11 +2815,14 @@ function DuzenleDiyalog({
     if (talebe && sayfaOdakli && sayfaInputRef.current) {
       // Radix Dialog'un kendi odağını tamamlaması için kısa gecikme
       const id = window.setTimeout(() => {
-        sayfaInputRef.current?.focus();
-        sayfaInputRef.current?.select();
+        const input = sayfaInputRef.current;
+        if (!input) return;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
       }, 180);
       return () => window.clearTimeout(id);
     }
+    return undefined;
   }, [talebe, sayfaOdakli]);
 
   const sayfaDogrula = (deger: string): number | null => {
@@ -2079,12 +2862,14 @@ function DuzenleDiyalog({
   return (
     <Dialog open={!!talebe} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="sm:max-w-md"
+        className="flex h-dvh max-h-none w-full max-w-full flex-col gap-3 overflow-y-auto rounded-none border-0 p-4 sm:p-6"
         onOpenAutoFocus={(e) => {
           if (sayfaOdakli) {
             e.preventDefault();
-            sayfaInputRef.current?.focus();
-            sayfaInputRef.current?.select();
+            const input = sayfaInputRef.current;
+            if (!input) return;
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
           }
         }}
       >
