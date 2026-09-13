@@ -18,13 +18,24 @@ export type PdfTablo = {
   sutunlar: PdfSutun[];
   satirlar: (PdfSatir | (string | number)[])[];
   dosyaAdi?: string;
+  tekSayfa?: boolean;
 };
 
 function kacis(s: string | number) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
-export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAdi }: PdfTablo) {
+export function listeYazdir({
+  altBaslik,
+  bilgi = [],
+  sutunlar,
+  satirlar,
+  dosyaAdi,
+  tekSayfa = false,
+}: PdfTablo) {
   const tarih = new Date().toLocaleDateString("tr-TR", {
     day: "2-digit",
     month: "long",
@@ -46,6 +57,17 @@ export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAd
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  body.tek-sayfa { font-size: 9px; }
+  body.tek-sayfa .ust { padding-bottom: 6px; margin-bottom: 8px; }
+  body.tek-sayfa h1 { font-size: 14px; }
+  body.tek-sayfa h2 { font-size: 11px; }
+  body.tek-sayfa .meta { font-size: 8px; gap: 8px; }
+  body.tek-sayfa table { font-size: 8px; }
+  body.tek-sayfa thead th { padding: 3px 4px; }
+  body.tek-sayfa tbody td { padding: 2px 4px; }
+  body.tek-sayfa tfoot { display: none; }
+  body.tek-sayfa tr { page-break-inside: auto; }
+  body.tek-sayfa @page { size: A4; margin: 8mm 6mm; }
   .ust { border-bottom: 2px solid #1f6f4a; padding-bottom: 10px; margin-bottom: 14px; }
   h1 { margin: 0; font-size: 20px; letter-spacing: .5px; color: #1f6f4a; }
   h2 { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #3d4a43; }
@@ -64,7 +86,7 @@ export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAd
   tr { page-break-inside: avoid; }
 </style>
 </head>
-<body>
+<body class="${tekSayfa ? "tek-sayfa" : ""}">
   <div class="ust">
     <h1>SİEC JİGJİGA KURSU</h1>
     <h2>${kacis(altBaslik)}</h2>
@@ -89,7 +111,10 @@ export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAd
           const hucreler = Array.isArray(r) ? r : r.hucreler;
           const cls = !Array.isArray(r) && r.className ? ` ${r.className}` : "";
           return `<tr class="${cls.trim()}">${hucreler
-            .map((c, i) => `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`)
+            .map(
+              (c, i) =>
+                `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`,
+            )
             .join("")}</tr>`;
         })
         .join("")}
@@ -103,7 +128,7 @@ export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAd
       window.focus();
       window.print();
     };
-  </script>
+  <\/script>
 </body>
 </html>`;
 

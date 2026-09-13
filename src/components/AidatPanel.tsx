@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useBugun } from "@/lib/bugun";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +11,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronLeft, ChevronRight, Check, X, Wallet, Pencil } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  X,
+  Wallet,
+  Pencil,
+} from "lucide-react";
 import {
   aidatTutariniDinle,
   aidatTutariKaydet,
   aidatOdemeAyarla,
-  GRUPLAR,
   type Grup,
   type Talebe,
 } from "@/lib/talebeler";
+import { useGruplar } from "@/hooks/use-gruplar";
 import { bashHarfler } from "@/lib/foto";
 
 const AY_ADLARI = [
@@ -58,10 +66,29 @@ export default function AidatPanel({
   const simdi = new Date();
   const [yil, setYil] = useState(simdi.getFullYear());
   const [ay, setAy] = useState(simdi.getMonth());
+
+  // Ay (veya yıl) değişince, kullanıcı o an içinde bulunulan ayı
+  // görüntülüyorsa otomatik olarak yeni aya geç; başka bir ayı
+  // inceliyorsa orada kal.
+  const bugun = useBugun();
+  const oncekiAyAnahtar = useRef(`${simdi.getFullYear()}-${simdi.getMonth()}`);
+  useEffect(() => {
+    const d = new Date();
+    const yeniAnahtar = `${d.getFullYear()}-${d.getMonth()}`;
+    const eskiAnahtar = oncekiAyAnahtar.current;
+    if (eskiAnahtar === yeniAnahtar) return;
+    oncekiAyAnahtar.current = yeniAnahtar;
+    if (`${yil}-${ay}` === eskiAnahtar) {
+      setYil(d.getFullYear());
+      setAy(d.getMonth());
+    }
+  }, [bugun, yil, ay]);
+
   const [tutar, setTutar] = useState(0);
   const [tutarDuzenle, setTutarDuzenle] = useState(false);
   const [tutarTaslak, setTutarTaslak] = useState("0");
   const [filtre, setFiltre] = useState<"tumu" | "odeyen" | "odemeyen">("tumu");
+
 
   useEffect(() => {
     const unsub = aidatTutariniDinle((t) => {
@@ -73,12 +100,14 @@ export default function AidatPanel({
 
   const ayKey = ayKeyOlustur(yil, ay);
 
+  const gruplar = useGruplar();
+
   const grupTalebeler = useMemo(() => {
     if (grupFiltre === "hepsi") return talebeler;
     return talebeler.filter((t) => t.grup === grupFiltre);
   }, [talebeler, grupFiltre]);
 
-  const aktifGrup = GRUPLAR.find((g) => g.id === grupFiltre);
+  const aktifGrup = gruplar.find((g) => g.id === grupFiltre);
 
   const ozet = useMemo(() => {
     const odeyen = grupTalebeler.filter((t) => t.aidat?.[ayKey]).length;
@@ -110,10 +139,14 @@ export default function AidatPanel({
     setFiltre("tumu");
   };
 
-  const buAy = yil === simdi.getFullYear() && ay === simdi.getMonth();
+  const buAy =
+    yil === simdi.getFullYear() && ay === simdi.getMonth();
+
+  const ayEtiket = `${AY_ADLARI[ay]} ${yil}`;
+  const grupAdi = aktifGrup?.ad ?? "Tüm gruplar";
 
   return (
-    <div>
+    <div className="flex flex-1 flex-col">
       {/* Aidat tutarı */}
       <Card className="mb-3 border-accent/40 bg-secondary/40">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
@@ -210,7 +243,8 @@ export default function AidatPanel({
 
       {aktifGrup && (
         <p className="mb-3 text-xs text-muted-foreground">
-          Mesul hoca: <span className="font-medium text-foreground">{aktifGrup.hoca}</span>
+          Mesul hoca:{" "}
+          <span className="font-medium text-foreground">{aktifGrup.hoca}</span>
         </p>
       )}
 
@@ -221,14 +255,18 @@ export default function AidatPanel({
           deger={`${ozet.odeyen}/${ozet.toplam}`}
           vurgu="iyi"
           aktif={filtre === "odeyen"}
-          onClick={() => setFiltre((f) => (f === "odeyen" ? "tumu" : "odeyen"))}
+          onClick={() =>
+            setFiltre((f) => (f === "odeyen" ? "tumu" : "odeyen"))
+          }
         />
         <Ozet
           etiket="Ödemeyen"
           deger={String(ozet.odemeyen)}
           vurgu="uyari"
           aktif={filtre === "odemeyen"}
-          onClick={() => setFiltre((f) => (f === "odemeyen" ? "tumu" : "odemeyen"))}
+          onClick={() =>
+            setFiltre((f) => (f === "odemeyen" ? "tumu" : "odemeyen"))
+          }
         />
         <Ozet
           etiket="Toplanan"
@@ -236,88 +274,105 @@ export default function AidatPanel({
           vurgu="iyi"
           onClick={() => setFiltre("tumu")}
         />
-        <Ozet etiket="Kalan" deger={paraFmt(ozet.kalan)} onClick={() => setFiltre("tumu")} />
+        <Ozet
+          etiket="Kalan"
+          deger={paraFmt(ozet.kalan)}
+          onClick={() => setFiltre("tumu")}
+        />
       </div>
 
-      <Card className="overflow-hidden">
-        <Table className="table-fixed">
+      <Card className="flex flex-1 flex-col overflow-hidden">
+          <Table className="table-fixed">
           <colgroup>
             <col className="w-[6%]" />
             <col className="w-[44%]" />
             <col className="w-[15%]" />
             <col className="w-[35%]" />
           </colgroup>
-          <TableHeader>
-            <TableRow className="bg-muted/40">
-              <TableHead className="w-8 px-1 text-center text-xs sm:w-12 sm:px-4">#</TableHead>
-              <TableHead className="px-1 text-xs sm:px-4 sm:text-sm">Talebe</TableHead>
-              <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">
-                Tutar
-              </TableHead>
-              <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">
-                Durum
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {gorunenTalebeler.map((t, i) => {
-              const odendi = !!t.aidat?.[ayKey];
-              return (
-                <TableRow key={t.id} className="hover:bg-muted/30">
-                  <TableCell className="px-1 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
-                    {i + 1}
-                  </TableCell>
-                  <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-4 sm:py-3">
-                    <button
-                      type="button"
-                      onClick={() => onTalebe?.(t)}
-                      className="group flex w-full min-w-0 items-center gap-1.5 text-left text-xs hover:text-primary sm:gap-3 sm:text-sm"
-                    >
-                      <span className="shrink-0 scale-90 sm:scale-100">
-                        <TalebeAvatar talebe={t} boyut={36} />
-                      </span>
-                      <span className="min-w-0 truncate group-hover:underline">{t.isim}</span>
-                    </button>
-                  </TableCell>
-                  <TableCell className="px-0.5 py-2 text-center text-[10px] tabular-nums text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
-                    <span className="sm:hidden">{tutar.toLocaleString("tr-TR")}</span>
-                    <span className="hidden sm:inline">{paraFmt(tutar)}</span>
-                  </TableCell>
-                  <TableCell className="px-0.5 py-2 text-center sm:px-4 sm:py-3">
-                    <button
-                      type="button"
-                      disabled={!hocaModu}
-                      onClick={() => void aidatOdemeAyarla(t, ayKey, !odendi)}
-                      className={`inline-flex max-w-full items-center gap-0.5 rounded-full px-1.5 py-1 text-[10px] font-medium transition sm:gap-1 sm:px-2.5 sm:text-sm ${
-                        odendi ? "bg-primary/15 text-primary" : "bg-destructive/10 text-destructive"
-                      } ${hocaModu ? "hover:opacity-80" : "cursor-default"}`}
-                    >
-                      {odendi ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-                      {odendi ? "Ödedi" : "Ödemedi"}
-                    </button>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="w-8 px-1 text-center text-xs sm:w-12 sm:px-4">
+                  #
+                </TableHead>
+                <TableHead className="px-1 text-xs sm:px-4 sm:text-sm">Talebe</TableHead>
+                <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">
+                  Tutar
+                </TableHead>
+                <TableHead className="px-0.5 text-center text-[10px] sm:px-4 sm:text-sm">
+                  Durum
+                </TableHead>
+              </TableRow>
+
+            </TableHeader>
+            <TableBody>
+              {gorunenTalebeler.map((t, i) => {
+                const odendi = !!t.aidat?.[ayKey];
+                return (
+                  <TableRow key={t.id} className="hover:bg-muted/30">
+                    <TableCell className="px-1 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                      {i + 1}
+                    </TableCell>
+                    <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-4 sm:py-3">
+                      <button
+                        type="button"
+                        onClick={() => onTalebe?.(t)}
+                        className="group flex w-full min-w-0 items-center gap-1.5 text-left text-xs hover:text-primary sm:gap-3 sm:text-sm"
+                      >
+                        <span className="shrink-0 scale-90 sm:scale-100">
+                          <TalebeAvatar talebe={t} boyut={36} />
+                        </span>
+                        <span className="min-w-0 truncate group-hover:underline">
+                          {t.isim}
+                        </span>
+                      </button>
+                    </TableCell>
+                    <TableCell className="px-0.5 py-2 text-center text-[10px] tabular-nums text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                      <span className="sm:hidden">{tutar.toLocaleString("tr-TR")}</span>
+                      <span className="hidden sm:inline">{paraFmt(tutar)}</span>
+                    </TableCell>
+                    <TableCell className="px-0.5 py-2 text-center sm:px-4 sm:py-3">
+                      <button
+                        type="button"
+                        disabled={!hocaModu}
+                        onClick={() =>
+                          void aidatOdemeAyarla(t, ayKey, !odendi)
+                        }
+                        className={`inline-flex max-w-full items-center gap-0.5 rounded-full px-1.5 py-1 text-[10px] font-medium transition sm:gap-1 sm:px-2.5 sm:text-sm ${
+                          odendi
+                            ? "bg-primary/15 text-primary"
+                            : "bg-destructive/10 text-destructive"
+                        } ${hocaModu ? "hover:opacity-80" : "cursor-default"}`}
+                      >
+                        {odendi ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                        {odendi ? "Ödedi" : "Ödemedi"}
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {gorunenTalebeler.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={4}
+
+                    className="py-10 text-center text-sm text-muted-foreground"
+                  >
+                    {grupTalebeler.length === 0
+                      ? "Henüz talebe yok."
+                      : filtre === "odeyen"
+                        ? "Bu ay ödeyen talebe yok."
+                        : filtre === "odemeyen"
+                          ? "Bu ay ödemeyen talebe yok."
+                          : "Henüz talebe yok."}
                   </TableCell>
                 </TableRow>
-              );
-            })}
-            {gorunenTalebeler.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  {grupTalebeler.length === 0
-                    ? "Henüz talebe yok."
-                    : filtre === "odeyen"
-                      ? "Bu ay ödeyen talebe yok."
-                      : filtre === "odemeyen"
-                        ? "Bu ay ödemeyen talebe yok."
-                        : "Henüz talebe yok."}
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
       </Card>
     </div>
   );
@@ -371,7 +426,13 @@ function Ozet({
   return <Card className="border-border/60">{icerik}</Card>;
 }
 
-function TalebeAvatar({ talebe, boyut = 40 }: { talebe: Talebe; boyut?: number }) {
+function TalebeAvatar({
+  talebe,
+  boyut = 40,
+}: {
+  talebe: Talebe;
+  boyut?: number;
+}) {
   const stil = { width: boyut, height: boyut } as const;
   if (talebe.fotoUrl) {
     return (

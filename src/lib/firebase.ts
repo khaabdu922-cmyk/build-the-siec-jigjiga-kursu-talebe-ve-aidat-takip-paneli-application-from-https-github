@@ -4,6 +4,7 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  type Firestore,
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -18,9 +19,10 @@ const firebaseConfig = {
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Tarayıcıda kalıcı (IndexedDB) önbellek: veriler anında yerelden gelir,
-// gereksiz ağ sorguları yapılmaz. Sunucuda düz Firestore kullanılır.
-function firestoreOlustur() {
+// Tarayıcıda kalıcı (IndexedDB) önbellek: uygulama açılır açılmaz veriler
+// yerelden gösterilir, arka planda sunucudan tazelenir (stale-while-revalidate).
+// Çok sekmeli kullanım da desteklenir.
+function firestoreOlustur(): Firestore {
   if (typeof window === "undefined") return getFirestore(app);
   try {
     return initializeFirestore(app, {
@@ -29,6 +31,7 @@ function firestoreOlustur() {
       }),
     });
   } catch {
+    // Zaten başlatılmışsa mevcut örneği kullan.
     return getFirestore(app);
   }
 }
