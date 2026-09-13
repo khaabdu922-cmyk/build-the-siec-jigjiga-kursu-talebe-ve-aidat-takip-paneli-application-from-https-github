@@ -103,7 +103,7 @@ export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAd
       window.focus();
       window.print();
     };
-  <\/script>
+  </script>
 </body>
 </html>`;
 

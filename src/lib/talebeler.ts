@@ -80,7 +80,9 @@ function yereleYaz(liste: Talebe[]) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
-  } catch {}
+  } catch {
+    // yoksay
+  }
 }
 
 function talebeCacheYaz(liste: Talebe[], kalici = true) {
@@ -235,7 +237,9 @@ function aidatCacheYaz(tutar: number) {
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(AIDAT_CACHE_KEY, String(tutar));
-    } catch {}
+    } catch {
+    // yoksay
+  }
   }
 }
 
