@@ -94,10 +94,7 @@ export function talebeleriOnbellektenOku(): Talebe[] | null {
   return talebeCache;
 }
 
-export function talebeleriDinle(
-  cb: (t: Talebe[]) => void,
-  onError?: (e: Error) => void,
-) {
+export function talebeleriDinle(cb: (t: Talebe[]) => void, onError?: (e: Error) => void) {
   talebeAboneler.add(cb);
   if (onError) talebeHataAboneler.add(onError);
 
@@ -133,8 +130,7 @@ function baslatTalebeDinleyici() {
               ? (v.kiraatGunler as Record<string, number[]>)
               : {},
           sayfa: typeof v.sayfa === "number" ? v.sayfa : 1,
-          hedefHaftalik:
-            typeof v.hedefHaftalik === "number" ? v.hedefHaftalik : 5,
+          hedefHaftalik: typeof v.hedefHaftalik === "number" ? v.hedefHaftalik : 5,
           gecmis: Array.isArray(v.gecmis) ? v.gecmis : [],
           sira: typeof v.sira === "number" ? v.sira : 0,
           fotoUrl: typeof v.fotoUrl === "string" ? v.fotoUrl : undefined,
@@ -152,10 +148,7 @@ function baslatTalebeDinleyici() {
             v.hadisGunler && typeof v.hadisGunler === "object"
               ? (v.hadisGunler as Record<string, number[]>)
               : {},
-          aidat:
-            v.aidat && typeof v.aidat === "object"
-              ? (v.aidat as Record<string, boolean>)
-              : {},
+          aidat: v.aidat && typeof v.aidat === "object" ? (v.aidat as Record<string, boolean>) : {},
           grup:
             v.grup === "seviye1" || v.grup === "seviye2" || v.grup === "hazirlik"
               ? v.grup
@@ -175,10 +168,7 @@ function baslatTalebeDinleyici() {
 }
 
 // Sunucu yanıtı beklenmeden yerel listeyi/önbelleği günceller.
-function iyimserUygula(
-  degistir: (liste: Talebe[]) => Talebe[],
-  kalici = false,
-) {
+function iyimserUygula(degistir: (liste: Talebe[]) => Talebe[], kalici = false) {
   const mevcut = talebeleriOnbellektenOku();
   if (!mevcut) return;
   talebeCacheYaz(degistir(mevcut), kalici);
@@ -195,14 +185,8 @@ export async function talebeEkle(t: Omit<Talebe, "id">) {
   return ref.id;
 }
 
-export async function talebeGuncelle(
-  id: string,
-  patch: Partial<Omit<Talebe, "id">>,
-) {
-  iyimserUygula(
-    (l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    true,
-  );
+export async function talebeGuncelle(id: string, patch: Partial<Omit<Talebe, "id">>) {
+  iyimserUygula((l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)), true);
   await updateDoc(doc(db, COL, id), patch as Record<string, unknown>);
 }
 
@@ -213,14 +197,11 @@ export async function talebeSil(id: string) {
 
 export async function topluHedefGuncelle(ids: string[], hedef: number) {
   iyimserUygula(
-    (l) =>
-      l.map((t) => (ids.includes(t.id) ? { ...t, hedefHaftalik: hedef } : t)),
+    (l) => l.map((t) => (ids.includes(t.id) ? { ...t, hedefHaftalik: hedef } : t)),
     true,
   );
   const batch = writeBatch(db);
-  ids.forEach((id) =>
-    batch.update(doc(db, COL, id), { hedefHaftalik: hedef }),
-  );
+  ids.forEach((id) => batch.update(doc(db, COL, id), { hedefHaftalik: hedef }));
   await batch.commit();
 }
 
@@ -298,11 +279,7 @@ export async function aidatTutariKaydet(tutar: number) {
   await setDoc(doc(db, AYAR_COL, AYAR_DOC), { aidatTutar: tutar }, { merge: true });
 }
 
-export async function aidatOdemeAyarla(
-  t: Talebe,
-  ayKey: string,
-  odendi: boolean,
-) {
+export async function aidatOdemeAyarla(t: Talebe, ayKey: string, odendi: boolean) {
   const harita = { ...(t.aidat ?? {}), [ayKey]: odendi };
   await talebeGuncelle(t.id, { aidat: harita });
 }
