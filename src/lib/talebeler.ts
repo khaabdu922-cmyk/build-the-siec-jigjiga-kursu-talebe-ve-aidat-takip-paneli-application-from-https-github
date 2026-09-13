@@ -238,8 +238,8 @@ function aidatCacheYaz(tutar: number) {
     try {
       localStorage.setItem(AIDAT_CACHE_KEY, String(tutar));
     } catch {
-    // yoksay
-  }
+      // yoksay
+    }
   }
 }
 

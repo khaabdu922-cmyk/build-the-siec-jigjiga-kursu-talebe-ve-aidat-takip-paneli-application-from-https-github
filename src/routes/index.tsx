@@ -430,16 +430,16 @@ function Index() {
       if (ad) setHoca(ad);
       if (sessionStorage.getItem(HOCA_OTURUM_KEY) === "1") setHocaModu(true);
     } catch {
-    // yoksay
-  }
+      // yoksay
+    }
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(HOCA_AD_KEY, hoca);
     } catch {
-    // yoksay
-  }
+      // yoksay
+    }
   }, [hoca]);
 
   // Firestore canlı veri
@@ -451,8 +451,8 @@ function Index() {
         try {
           localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
         } catch {
-    // yoksay
-  }
+          // yoksay
+        }
       },
       (e) => {
         setYuklemeHata(e.message);
