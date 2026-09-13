@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  lazy,
+  Suspense,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,7 +41,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import AidatPanel from "@/components/AidatPanel";
+// Ağır panel yalnızca Aidat sekmesi açıldığında yüklenir.
+const AidatPanel = lazy(() => import("@/components/AidatPanel"));
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,7 +99,9 @@ import {
 } from "@/lib/talebeler";
 import { dosyaFotoDataUrl, bashHarfler } from "@/lib/foto";
 import { aidatTutariniOku } from "@/lib/talebeler";
-import { listeYazdir } from "@/lib/pdf";
+// PDF modülü yalnızca indirme butonuna basıldığında yüklenir.
+const listeYazdir = async (...args: Parameters<typeof import("@/lib/pdf").listeYazdir>) =>
+  (await import("@/lib/pdf")).listeYazdir(...args);
 import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/")({
@@ -585,9 +597,9 @@ function Index() {
     setParolaDegistirHata(null);
   };
 
-  const hafizlikPdf = () => {
+  const hafizlikPdf = async () => {
     const gunler = tr("haftaGun").slice(0, 5);
-    listeYazdir({
+    await listeYazdir({
       altBaslik: "Hafızlık Takip Listesi",
       bilgi: [`Hafta: ${haftaEtiket(seciliHafta)}`, `Hocaefendi: ${hoca}`],
       sutunlar: [
@@ -629,7 +641,7 @@ function Index() {
       grupFiltre === "hepsi"
         ? "Tüm gruplar"
         : (GRUPLAR.find((g) => g.id === grupFiltre)?.ad ?? "Grup");
-    listeYazdir({
+    await listeYazdir({
       altBaslik: `Aidat Takip Listesi · ${ayAdi}`,
       bilgi: [
         `Grup: ${grupAdi}`,
@@ -656,8 +668,8 @@ function Index() {
     });
   };
 
-  const aidatListePdf = () => {
-    listeYazdir({
+  const aidatListePdf = async () => {
+    await listeYazdir({
       altBaslik: "Aidat Talebe Listesi",
       bilgi: [`Toplam talebe: ${aidatTalebeler.length}`],
       sutunlar: [
@@ -971,15 +983,23 @@ function Index() {
                 </Card>
               </>
             ) : (
-              <AidatPanel
-                talebeler={aidatTalebeler}
-                hocaModu={hocaModu}
-                onTalebe={(t) => {
-                  setProfilAidattan(true);
-                  setProfilGoster(t);
-                }}
-                grupFiltre={grupFiltre}
-              />
+              <Suspense
+                fallback={
+                  <div className="py-10 text-center text-sm text-muted-foreground">
+                    Yükleniyor…
+                  </div>
+                }
+              >
+                <AidatPanel
+                  talebeler={aidatTalebeler}
+                  hocaModu={hocaModu}
+                  onTalebe={(t) => {
+                    setProfilAidattan(true);
+                    setProfilGoster(t);
+                  }}
+                  grupFiltre={grupFiltre}
+                />
+              </Suspense>
             )
           ) : (
             <>
