@@ -1,18 +1,3 @@
-import {
-  collection,
-  doc,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  writeBatch,
-  getDoc,
-  setDoc,
-  query,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "./firebase";
-
 export type SayfaKaydi = { t: number; sayfa: number };
 
 export type KiraatYonu = "alttan" | "ustten";
@@ -52,15 +37,30 @@ export type Talebe = {
   aidatHaric?: boolean;
 };
 
-const COL = "talebeler";
+// Firestore/Firebase SDK'sı ağırdır; ilk boyamayı geciktirmemesi için
+// yalnızca gerektiğinde (dinamik import) yüklenir.
+type FsModul = typeof import("./talebeler.fs");
+let fsSoz: Promise<FsModul> | null = null;
+function fs(): Promise<FsModul> {
+  if (!fsSoz) fsSoz = import("./talebeler.fs");
+  return fsSoz;
+}
+
+// İlk render'dan sonra, tarayıcı boştayken arka planda yükle.
+function bosaldiginda(f: () => void) {
+  if (typeof window === "undefined") return f();
+  const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => void })
+    .requestIdleCallback;
+  if (ric) ric(f);
+  else setTimeout(f, 1);
+}
 
 // ---- Paylaşımlı önbellek + tekil dinleyici ----
-// Aynı veriyi kullanan bileşenler tek bir Firestore aboneliğini paylaşır;
-// yeni abone olanlara son bilinen veri anında verilir.
 const TALEBE_CACHE_KEY = "talebe-takip-cache-v1";
 
 let talebeCache: Talebe[] | null = null;
 let talebeUnsub: (() => void) | null = null;
+let talebeDinleyiciKuruldu = false;
 const talebeAboneler = new Set<(t: Talebe[]) => void>();
 const talebeHataAboneler = new Set<(e: Error) => void>();
 
@@ -106,8 +106,16 @@ export function talebeleriDinle(cb: (t: Talebe[]) => void, onError?: (e: Error) 
 
   // Dinleyici bir kez kurulur ve açık kalır: diğer cihazlardaki
   // değişiklikler anında (saniyeler içinde) buraya düşer.
-  if (!talebeUnsub) {
-    talebeUnsub = baslatTalebeDinleyici();
+  if (!talebeDinleyiciKuruldu) {
+    talebeDinleyiciKuruldu = true;
+    bosaldiginda(() => {
+      void fs().then((m) => {
+        talebeUnsub = m.dinle(
+          (liste) => talebeCacheYaz(liste),
+          (err) => talebeHataAboneler.forEach((f) => f(err)),
+        );
+      });
+    });
   }
 
   return () => {
@@ -116,57 +124,10 @@ export function talebeleriDinle(cb: (t: Talebe[]) => void, onError?: (e: Error) 
   };
 }
 
-function baslatTalebeDinleyici() {
-  const q = query(collection(db, COL), orderBy("sira", "asc"));
-  return onSnapshot(
-    q,
-    (snap) => {
-      const liste: Talebe[] = snap.docs.map((d) => {
-        const v = d.data() as Partial<Talebe>;
-        return {
-          id: d.id,
-          isim: v.isim ?? "Talebe",
-          kiraat: !!v.kiraat,
-          kiraatGunler:
-            v.kiraatGunler && typeof v.kiraatGunler === "object"
-              ? (v.kiraatGunler as Record<string, number[]>)
-              : {},
-          sayfa: typeof v.sayfa === "number" ? v.sayfa : 1,
-          hedefHaftalik: typeof v.hedefHaftalik === "number" ? v.hedefHaftalik : 5,
-          gecmis: Array.isArray(v.gecmis) ? v.gecmis : [],
-          sira: typeof v.sira === "number" ? v.sira : 0,
-          fotoUrl: typeof v.fotoUrl === "string" ? v.fotoUrl : undefined,
-          telefon: typeof v.telefon === "string" ? v.telefon : undefined,
-          dogum: typeof v.dogum === "string" ? v.dogum : undefined,
-          notlar: typeof v.notlar === "string" ? v.notlar : undefined,
-          yon: v.yon === "ustten" ? "ustten" : "alttan",
-          fikihKonu: typeof v.fikihKonu === "number" ? v.fikihKonu : 1,
-          fikihGunler:
-            v.fikihGunler && typeof v.fikihGunler === "object"
-              ? (v.fikihGunler as Record<string, number[]>)
-              : {},
-          hadisNo: typeof v.hadisNo === "number" ? v.hadisNo : 1,
-          hadisGunler:
-            v.hadisGunler && typeof v.hadisGunler === "object"
-              ? (v.hadisGunler as Record<string, number[]>)
-              : {},
-          aidat: v.aidat && typeof v.aidat === "object" ? (v.aidat as Record<string, boolean>) : {},
-          grup:
-            v.grup === "seviye1" || v.grup === "seviye2" || v.grup === "hazirlik"
-              ? v.grup
-              : undefined,
-          sinif: typeof v.sinif === "string" ? v.sinif : undefined,
-          aidatSadece: v.aidatSadece === true,
-          aidatHaric: v.aidatHaric === true,
-        };
-      });
-      talebeCacheYaz(liste);
-    },
-    (err) => {
-      console.error("Firestore dinleme hatası", err);
-      talebeHataAboneler.forEach((f) => f(err));
-    },
-  );
+export function talebeDinleyiciDurdur() {
+  talebeUnsub?.();
+  talebeUnsub = null;
+  talebeDinleyiciKuruldu = false;
 }
 
 // Sunucu yanıtı beklenmeden yerel listeyi/önbelleği günceller.
@@ -183,18 +144,17 @@ export async function talebeEkle(t: Omit<Talebe, "id">) {
       (a, b) => (a.sira ?? 0) - (b.sira ?? 0),
     ),
   );
-  const ref = await addDoc(collection(db, COL), t);
-  return ref.id;
+  return (await fs()).ekle(t);
 }
 
 export async function talebeGuncelle(id: string, patch: Partial<Omit<Talebe, "id">>) {
   iyimserUygula((l) => l.map((t) => (t.id === id ? { ...t, ...patch } : t)), true);
-  await updateDoc(doc(db, COL, id), patch as Record<string, unknown>);
+  await (await fs()).guncelle(id, patch);
 }
 
 export async function talebeSil(id: string) {
   iyimserUygula((l) => l.filter((t) => t.id !== id), true);
-  await deleteDoc(doc(db, COL, id));
+  await (await fs()).sil(id);
 }
 
 export async function topluHedefGuncelle(ids: string[], hedef: number) {
@@ -202,20 +162,15 @@ export async function topluHedefGuncelle(ids: string[], hedef: number) {
     (l) => l.map((t) => (ids.includes(t.id) ? { ...t, hedefHaftalik: hedef } : t)),
     true,
   );
-  const batch = writeBatch(db);
-  ids.forEach((id) => batch.update(doc(db, COL, id), { hedefHaftalik: hedef }));
-  await batch.commit();
+  await (await fs()).topluHedef(ids, hedef);
 }
 
 // ---- Aidat (aylık ödeme) ----
 
-const AYAR_COL = "ayarlar";
-const AYAR_DOC = "genel";
-
 const AIDAT_CACHE_KEY = "aidat-tutar-cache-v1";
 
 let aidatTutarCache: number | null = null;
-let aidatUnsub: (() => void) | null = null;
+let aidatDinleyiciKuruldu = false;
 const aidatAboneler = new Set<(t: number) => void>();
 
 function aidatOnbellek(): number | null {
@@ -248,10 +203,9 @@ export async function aidatTutariniOku(): Promise<number> {
   const onbellek = aidatOnbellek();
   if (onbellek !== null) return onbellek;
   try {
-    const snap = await getDoc(doc(db, AYAR_COL, AYAR_DOC));
-    const v = snap.data()?.aidatTutar;
-    aidatCacheYaz(typeof v === "number" ? v : 0);
-    return aidatTutarCache as number;
+    const tutar = await (await fs()).aidatOku();
+    aidatCacheYaz(tutar);
+    return tutar;
   } catch {
     return 0;
   }
@@ -263,11 +217,15 @@ export function aidatTutariniDinle(cb: (tutar: number) => void) {
   if (onbellek !== null) cb(onbellek);
 
   // Dinleyici açık kalır: tutar başka bir cihazda değişirse anında yansır.
-  if (!aidatUnsub) {
-    aidatUnsub = onSnapshot(doc(db, AYAR_COL, AYAR_DOC), (snap) => {
-      const v = snap.data()?.aidatTutar;
-      aidatCacheYaz(typeof v === "number" ? v : 0);
-      aidatAboneler.forEach((f) => f(aidatTutarCache as number));
+  if (!aidatDinleyiciKuruldu) {
+    aidatDinleyiciKuruldu = true;
+    bosaldiginda(() => {
+      void fs().then((m) =>
+        m.aidatDinle((tutar) => {
+          aidatCacheYaz(tutar);
+          aidatAboneler.forEach((f) => f(tutar));
+        }),
+      );
     });
   }
 
@@ -280,7 +238,7 @@ export async function aidatTutariKaydet(tutar: number) {
   // İyimser güncelleme: ekranda anında görünür.
   aidatCacheYaz(tutar);
   aidatAboneler.forEach((f) => f(tutar));
-  await setDoc(doc(db, AYAR_COL, AYAR_DOC), { aidatTutar: tutar }, { merge: true });
+  await (await fs()).aidatKaydet(tutar);
 }
 
 export async function aidatOdemeAyarla(t: Talebe, ayKey: string, odendi: boolean) {
