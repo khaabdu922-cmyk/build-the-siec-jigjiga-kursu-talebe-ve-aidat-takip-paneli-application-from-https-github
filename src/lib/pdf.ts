@@ -21,19 +21,10 @@ export type PdfTablo = {
 };
 
 function kacis(s: string | number) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function listeYazdir({
-  altBaslik,
-  bilgi = [],
-  sutunlar,
-  satirlar,
-  dosyaAdi,
-}: PdfTablo) {
+export function listeYazdir({ altBaslik, bilgi = [], sutunlar, satirlar, dosyaAdi }: PdfTablo) {
   const tarih = new Date().toLocaleDateString("tr-TR", {
     day: "2-digit",
     month: "long",
@@ -98,10 +89,7 @@ export function listeYazdir({
           const hucreler = Array.isArray(r) ? r : r.hucreler;
           const cls = !Array.isArray(r) && r.className ? ` ${r.className}` : "";
           return `<tr class="${cls.trim()}">${hucreler
-            .map(
-              (c, i) =>
-                `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`,
-            )
+            .map((c, i) => `<td style="text-align:${sutunlar[i]?.hiza ?? "left"}">${kacis(c)}</td>`)
             .join("")}</tr>`;
         })
         .join("")}
@@ -115,7 +103,7 @@ export function listeYazdir({
       window.focus();
       window.print();
     };
-  <\/script>
+  </script>
 </body>
 </html>`;
 

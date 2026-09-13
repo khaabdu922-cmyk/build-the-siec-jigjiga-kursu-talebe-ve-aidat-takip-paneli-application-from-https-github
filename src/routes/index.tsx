@@ -245,15 +245,7 @@ const SOZLUK = {
     hadisNo: "Hadis No",
     dersSecimi: "Ders",
     haftaGun: ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Pzr"],
-    haftaGunUzun: [
-      "Pazartesi",
-      "Salı",
-      "Çarşamba",
-      "Perşembe",
-      "Cuma",
-      "Cumartesi",
-      "Pazar",
-    ],
+    haftaGunUzun: ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"],
   },
 } as const;
 
@@ -305,22 +297,19 @@ function sayfaOnceFn(t: Talebe, esik: number) {
   const oncekiler = t.gecmis.filter((g) => g.t < esik);
   return oncekiler.length > 0
     ? oncekiler[oncekiler.length - 1].sayfa
-    : t.gecmis[0]?.sayfa ?? t.sayfa;
+    : (t.gecmis[0]?.sayfa ?? t.sayfa);
 }
 
 function ilerleme(t: Talebe, baslangic: number, bitis: number) {
   const baz = sayfaOnceFn(t, baslangic);
   const son = sayfaOnceFn(t, bitis);
-  return t.yon === "ustten"
-    ? Math.max(0, baz - son)
-    : Math.max(0, son - baz);
+  return t.yon === "ustten" ? Math.max(0, baz - son) : Math.max(0, son - baz);
 }
 
 function haftaEtiket(baslangic: number) {
   const b = new Date(baslangic);
   const s = new Date(baslangic + 6 * 24 * 60 * 60 * 1000);
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
+  const fmt = (d: Date) => d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" });
   return `${fmt(b)} – ${fmt(s)}`;
 }
 
@@ -440,13 +429,17 @@ function Index() {
       const ad = localStorage.getItem(HOCA_AD_KEY);
       if (ad) setHoca(ad);
       if (sessionStorage.getItem(HOCA_OTURUM_KEY) === "1") setHocaModu(true);
-    } catch {}
+    } catch {
+      // yoksay
+    }
   }, []);
 
   useEffect(() => {
     try {
       localStorage.setItem(HOCA_AD_KEY, hoca);
-    } catch {}
+    } catch {
+      // yoksay
+    }
   }, [hoca]);
 
   // Firestore canlı veri
@@ -457,7 +450,9 @@ function Index() {
         setYuklendi(true);
         try {
           localStorage.setItem(TALEBE_CACHE_KEY, JSON.stringify(liste));
-        } catch {}
+        } catch {
+          // yoksay
+        }
       },
       (e) => {
         setYuklemeHata(e.message);
@@ -472,10 +467,7 @@ function Index() {
     if (!mevcut) return;
     const patch: Partial<Talebe> = { ...alan };
     if (alan.sayfa !== undefined && alan.sayfa !== mevcut.sayfa) {
-      patch.gecmis = [
-        ...mevcut.gecmis,
-        { t: Date.now(), sayfa: alan.sayfa },
-      ];
+      patch.gecmis = [...mevcut.gecmis, { t: Date.now(), sayfa: alan.sayfa }];
     }
     void talebeGuncelle(id, patch);
   };
@@ -489,7 +481,6 @@ function Index() {
     }
     void talebeSil(id);
   };
-
 
   const kiraatGunToggle = (t: Talebe, gun: number) => {
     const key = String(seciliHafta);
@@ -519,10 +510,7 @@ function Index() {
 
   const ekle = (sadeceAidat = false) => {
     const yeniNo = talebeler.length + 1;
-    const enBuyukSira = talebeler.reduce(
-      (m, t) => Math.max(m, t.sira ?? 0),
-      0,
-    );
+    const enBuyukSira = talebeler.reduce((m, t) => Math.max(m, t.sira ?? 0), 0);
     void talebeEkle({
       isim: `Talebe ${yeniNo}`,
       kiraat: false,
@@ -537,32 +525,21 @@ function Index() {
     });
   };
 
-  const hafizTalebeler = useMemo(
-    () => talebeler.filter((t) => !t.aidatSadece),
-    [talebeler],
-  );
-  const aidatTalebeler = useMemo(
-    () => talebeler.filter((t) => !t.aidatHaric),
-    [talebeler],
-  );
+  const hafizTalebeler = useMemo(() => talebeler.filter((t) => !t.aidatSadece), [talebeler]);
+  const aidatTalebeler = useMemo(() => talebeler.filter((t) => !t.aidatHaric), [talebeler]);
 
   const haftalikToplam = useMemo(
-    () =>
-      hafizTalebeler.reduce(
-        (acc, t) => acc + ilerleme(t, seciliHafta, haftaSonu),
-        0,
-      ),
+    () => hafizTalebeler.reduce((acc, t) => acc + ilerleme(t, seciliHafta, haftaSonu), 0),
     [hafizTalebeler, seciliHafta, haftaSonu],
   );
 
   const ozet = useMemo(() => {
     const toplam = hafizTalebeler.length;
-    const kiraatSayi = hafizTalebeler.filter(
-      (t) => getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun),
+    const kiraatSayi = hafizTalebeler.filter((t) =>
+      getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun),
     ).length;
     return { toplam, kiraatSayi };
   }, [hafizTalebeler, seciliHafta, seciliGun, seciliDers]);
-
 
   const girisYap = () => {
     if (parolaTaslak === mevcutParola()) {
@@ -646,9 +623,7 @@ function Index() {
       year: "numeric",
     });
     const liste =
-      grupFiltre === "hepsi"
-        ? aidatTalebeler
-        : aidatTalebeler.filter((t) => t.grup === grupFiltre);
+      grupFiltre === "hepsi" ? aidatTalebeler : aidatTalebeler.filter((t) => t.grup === grupFiltre);
     const odeyen = liste.filter((t) => t.aidat?.[ayKey]).length;
     const grupAdi =
       grupFiltre === "hepsi"
@@ -704,860 +679,834 @@ function Index() {
 
   return (
     <DilContext.Provider value={dil}>
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-2 py-4 sm:px-6 sm:py-12">
-        <header className="relative mb-6 flex flex-col items-center gap-3 text-center sm:mb-12 sm:gap-5">
-          <div className="absolute left-0 top-0 flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Menü"
-                  className="h-10 w-10 rounded-full"
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>Bölümler</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {([
-                  ["hafizlik", "Hafızlık takip paneli"],
-                  ["aidat", "Aidat takip paneli"],
-                ] as const).map(([k, etiket]) => (
-                  <DropdownMenuItem
-                    key={k}
-                    onSelect={() => {
-                      setSekme(k);
-                      setAidatListeAcik(false);
-                      if (k === "aidat") setGrupFiltre("hepsi");
-                    }}
-                    className={!aidatListeAcik && sekme === k ? "font-semibold text-primary" : ""}
+      <div className="min-h-screen bg-background">
+        <div className="mx-auto max-w-6xl px-2 py-4 sm:px-6 sm:py-12">
+          <header className="relative mb-6 flex flex-col items-center gap-3 text-center sm:mb-12 sm:gap-5">
+            <div className="absolute left-0 top-0 flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Menü"
+                    className="h-10 w-10 rounded-full"
                   >
-                    {etiket}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setSekme("aidat");
-                    setAidatListeAcik(true);
-                  }}
-                  className={aidatListeAcik ? "font-semibold text-primary" : ""}
-                >
-                  Aidat Talebe Listesi
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Gruplar</DropdownMenuLabel>
-                {([
-                  ["seviye1", "1. Seviye"],
-                  ["seviye2", "2. Seviye"],
-                  ["hazirlik", "Hazırlık"],
-                ] as const).map(([k, etiket]) => (
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel>Bölümler</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {(
+                    [
+                      ["hafizlik", "Hafızlık takip paneli"],
+                      ["aidat", "Aidat takip paneli"],
+                    ] as const
+                  ).map(([k, etiket]) => (
+                    <DropdownMenuItem
+                      key={k}
+                      onSelect={() => {
+                        setSekme(k);
+                        setAidatListeAcik(false);
+                        if (k === "aidat") setGrupFiltre("hepsi");
+                      }}
+                      className={!aidatListeAcik && sekme === k ? "font-semibold text-primary" : ""}
+                    >
+                      {etiket}
+                    </DropdownMenuItem>
+                  ))}
                   <DropdownMenuItem
-                    key={k}
                     onSelect={() => {
                       setSekme("aidat");
-                      setAidatListeAcik(false);
-                      setGrupFiltre(k as Grup | "hepsi");
+                      setAidatListeAcik(true);
                     }}
-                    className={
-                      !aidatListeAcik && sekme === "aidat" && grupFiltre === k
-                        ? "font-semibold text-primary"
-                        : ""
-                    }
+                    className={aidatListeAcik ? "font-semibold text-primary" : ""}
                   >
-                    {etiket}
+                    Aidat Talebe Listesi
                   </DropdownMenuItem>
-                ))}
-                {hocaModu && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Yönetim</DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={() => setAyarlarAcik(true)}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      {tr("ayarlar")}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Gruplar</DropdownMenuLabel>
+                  {(
+                    [
+                      ["seviye1", "1. Seviye"],
+                      ["seviye2", "2. Seviye"],
+                      ["hazirlik", "Hazırlık"],
+                    ] as const
+                  ).map(([k, etiket]) => (
+                    <DropdownMenuItem
+                      key={k}
+                      onSelect={() => {
+                        setSekme("aidat");
+                        setAidatListeAcik(false);
+                        setGrupFiltre(k as Grup | "hepsi");
+                      }}
+                      className={
+                        !aidatListeAcik && sekme === "aidat" && grupFiltre === k
+                          ? "font-semibold text-primary"
+                          : ""
+                      }
+                    >
+                      {etiket}
                     </DropdownMenuItem>
+                  ))}
+                  {hocaModu && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel>Yönetim</DropdownMenuLabel>
+                      <DropdownMenuItem onSelect={() => setAyarlarAcik(true)}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        {tr("ayarlar")}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
+                {aidatListeAcik
+                  ? "Aidat Talebe Listesi"
+                  : sekme === "aidat"
+                    ? tr("altBaslikAidat")
+                    : tr("altBaslikHafizlik")}
+              </span>
+            </div>
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-20 sm:w-20">
+              <GraduationCap className="h-7 w-7 sm:h-10 sm:w-10" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-6xl">
+                {tr("baslik")}
+              </h1>
+              <p className="mt-2 text-base text-muted-foreground sm:text-xl">
+                {aidatListeAcik
+                  ? "Aidat Talebe Listesi"
+                  : sekme === "aidat"
+                    ? tr("altBaslikAidat")
+                    : tr("altBaslikHafizlik")}
+              </p>
+            </div>
+          </header>
+
+          <Card className="mb-6 border-accent/40 bg-secondary/40">
+            <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {tr("hocaefendi")}
+                </span>
+                {hocaModu && hocaDuzenle ? (
+                  <>
+                    <Input
+                      autoFocus
+                      value={hocaTaslak}
+                      onChange={(e) => setHocaTaslak(e.target.value.slice(0, 60))}
+                      className="h-9 w-48"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setHoca(hocaTaslak.trim() || "Hocaefendi");
+                        setHocaDuzenle(false);
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setHocaDuzenle(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-base font-medium text-foreground">{hoca}</span>
+                    {hocaModu && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setHocaTaslak(hoca);
+                          setHocaDuzenle(true);
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
                   </>
                 )}
-              </DropdownMenuContent>
+              </div>
 
-            </DropdownMenu>
-            <span className="hidden text-sm font-medium text-muted-foreground sm:inline">
-              {aidatListeAcik
-                ? "Aidat Talebe Listesi"
-                : sekme === "aidat"
-                  ? tr("altBaslikAidat")
-                  : tr("altBaslikHafizlik")}
-            </span>
-          </div>
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary sm:h-20 sm:w-20">
-            <GraduationCap className="h-7 w-7 sm:h-10 sm:w-10" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-6xl">
-              {tr("baslik")}
-            </h1>
-            <p className="mt-2 text-base text-muted-foreground sm:text-xl">
-              {aidatListeAcik
-                ? "Aidat Talebe Listesi"
-                : sekme === "aidat"
-                  ? tr("altBaslikAidat")
-                  : tr("altBaslikHafizlik")}
-            </p>
-          </div>
-        </header>
+              <div className="flex items-center gap-2">
+                {hocaModu ? (
+                  <>
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                      {tr("duzenlemeModu")}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={cikisYap}>
+                      <LogOut className="h-4 w-4" /> {tr("cikisYap")}
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setGirisAcik(true)}>
+                    <Lock className="h-4 w-4" /> {tr("hocaefendiGirisi")}
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-
-        <Card className="mb-6 border-accent/40 bg-secondary/40">
-          <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground">
-                {tr("hocaefendi")}
-              </span>
-              {hocaModu && hocaDuzenle ? (
-                <>
-                  <Input
-                    autoFocus
-                    value={hocaTaslak}
-                    onChange={(e) => setHocaTaslak(e.target.value.slice(0, 60))}
-                    className="h-9 w-48"
-                  />
+          {sekme === "aidat" ? (
+            aidatListeAcik ? (
+              <>
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-base font-semibold text-foreground sm:text-lg">
+                    Aidat Talebe Listesi
+                  </h2>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => aidatListePdf()}
+                    className="gap-1.5 text-xs sm:text-sm"
+                  >
+                    <FileDown className="h-4 w-4" /> PDF İndir
+                  </Button>
+                </div>
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table className="table-fixed min-w-[540px]">
+                      <colgroup>
+                        <col className="w-[8%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[30%]" />
+                        <col className="w-[15%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[18%]" />
+                      </colgroup>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40">
+                          <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
+                            #
+                          </TableHead>
+                          <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
+                            Profil
+                          </TableHead>
+                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                            İsim
+                          </TableHead>
+                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                            Sınıf
+                          </TableHead>
+                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                            Grup
+                          </TableHead>
+                          <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
+                            Telefon
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aidatTalebeler.map((t, i) => (
+                          <TableRow key={t.id} className="hover:bg-muted/30">
+                            <TableCell className="px-1 py-2 text-center text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                              {i + 1}
+                            </TableCell>
+                            <TableCell className="px-1 py-2 sm:px-3 sm:py-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProfilAidattan(true);
+                                  setProfilGoster(t);
+                                }}
+                                className="flex w-full justify-center"
+                              >
+                                <span className="shrink-0 scale-90 sm:scale-100">
+                                  <TalebeAvatar talebe={t} boyut={36} />
+                                </span>
+                              </button>
+                            </TableCell>
+                            <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-3 sm:py-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setProfilAidattan(true);
+                                  setProfilGoster(t);
+                                }}
+                                className="block w-full min-w-0 truncate text-left text-[11px] hover:text-primary hover:underline sm:text-sm"
+                              >
+                                {t.isim}
+                              </button>
+                            </TableCell>
+                            <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                              <span className="block truncate">{t.sinif || "—"}</span>
+                            </TableCell>
+                            <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                              <span className="block truncate">
+                                {t.grup ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—") : "—"}
+                              </span>
+                            </TableCell>
+                            <TableCell className="min-w-0 px-1 py-2 text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
+                              {t.telefon ? (
+                                <a
+                                  href={`tel:${t.telefon.replace(/\s+/g, "")}`}
+                                  className="block truncate hover:text-primary hover:underline"
+                                >
+                                  {t.telefon}
+                                </a>
+                              ) : (
+                                <span className="block truncate">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {aidatTalebeler.length === 0 && (
+                          <TableRow>
+                            <TableCell
+                              colSpan={6}
+                              className="py-10 text-center text-sm text-muted-foreground"
+                            >
+                              Henüz aidat kaydı olan talebe yok.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              </>
+            ) : (
+              <AidatPanel
+                talebeler={aidatTalebeler}
+                hocaModu={hocaModu}
+                onTalebe={(t) => {
+                  setProfilAidattan(true);
+                  setProfilGoster(t);
+                }}
+                grupFiltre={grupFiltre}
+              />
+            )
+          ) : (
+            <>
+              <div className="mb-3 grid grid-cols-2 gap-3">
+                <OzetKart etiket={tr("toplamTalebe")} deger={ozet.toplam} />
+                <OzetKart
+                  etiket={`${tr(seciliDers === "kuran" ? "dersKuranKisa" : seciliDers === "fikih" ? "dersFikihKisa" : "dersHadisKisa")} (${tr("haftaGun")[seciliGun]})`}
+                  deger={`${ozet.kiraatSayi}/${ozet.toplam}`}
+                  onClick={() => setVermediAcik(true)}
+                />
+              </div>
+
+              <div className="mb-6 flex justify-end">
+                <Button size="sm" variant="outline" onClick={() => setRaporAcik(true)}>
+                  <CalendarDays className="h-4 w-4" /> {tr("haftaninRaporu")}
+                </Button>
+              </div>
+
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/30 px-3 py-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-foreground">{haftaBasligi}</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {haftaEtiket(seciliHafta)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setSeciliHafta((h) => h - HAFTA_MS)}
+                    aria-label={tr("oncekiHafta")}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setSeciliHafta(haftaBaslangici())}
+                    disabled={haftaFarki === 0}
+                  >
+                    {tr("buHafta")}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setSeciliHafta((h) => h + HAFTA_MS)}
+                    aria-label={tr("sonrakiHafta")}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <Card className="overflow-hidden">
+                <Table className="table-fixed">
+                  <colgroup>
+                    <col className="w-[6%]" />
+                    <col className={hocaModu ? "w-[44%]" : "w-[50%]"} />
+                    <col className={hocaModu ? "w-[20%]" : "w-[22%]"} />
+                    <col className="w-[10%]" />
+                    <col className="w-[10%]" />
+                    {hocaModu && <col className="w-[10%]" />}
+                  </colgroup>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="w-8 px-1 text-center text-xs sm:w-12 sm:px-4">
+                        #
+                      </TableHead>
+                      <TableHead className="px-1 text-xs sm:px-4 sm:text-sm">
+                        {tr("talebe")}
+                      </TableHead>
+                      <TableHead className="px-1 text-center sm:px-4">
+                        <Select
+                          value={String(seciliGun)}
+                          onValueChange={(v) => setSeciliGun(Number(v))}
+                        >
+                          <SelectTrigger className="mx-auto h-7 w-full min-w-0 px-1 text-[10px] sm:h-8 sm:w-[130px] sm:px-2 sm:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {tr("haftaGun")
+                              .map((isim, i) => ({ isim, i }))
+                              .filter(({ i }) => i < 5)
+                              .map(({ isim, i }) => (
+                                <SelectItem key={i} value={String(i)} className="text-sm">
+                                  {tr("ders")} · {isim}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </TableHead>
+                      <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">
+                        {tr("sf")}
+                      </TableHead>
+                      <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">
+                        {tr("cuz")}
+                      </TableHead>
+                      {hocaModu && (
+                        <TableHead className="px-0.5 text-right text-[10px] sm:px-4 sm:text-sm">
+                          {tr("islem")}
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {hafizTalebeler.map((t, i) => {
+                      const hafta = ilerleme(t, seciliHafta, haftaSonu);
+                      return (
+                        <TableRow key={t.id} className="hover:bg-muted/30">
+                          <TableCell className="px-1 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
+                            {i + 1}
+                          </TableCell>
+                          <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-4 sm:py-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setProfilAidattan(false);
+                                setProfilGoster(t);
+                              }}
+                              className="group flex w-full min-w-0 items-center gap-1 text-left text-xs hover:text-primary sm:gap-2 sm:text-sm"
+                            >
+                              <span className="shrink-0 scale-90 sm:scale-100">
+                                <TalebeAvatar talebe={t} boyut={38} />
+                              </span>
+                              <span className="min-w-0 truncate group-hover:underline">
+                                {t.isim}
+                              </span>
+                            </button>
+                          </TableCell>
+                          <TableCell className="px-0.5 py-2 text-center sm:px-4 sm:py-3">
+                            <GunDurum
+                              verdi={getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun)}
+                              duzenlenebilir={hocaModu}
+                              onToggle={() => dersGunToggle(t, seciliDers, seciliGun)}
+                            />
+                          </TableCell>
+                          <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums sm:px-4 sm:py-3 sm:text-base">
+                            <SayfaEditor
+                              talebe={t}
+                              duzenlenebilir={false}
+                              onKaydet={(yeni) => guncelle(t.id, { sayfa: yeni })}
+                            />
+                          </TableCell>
+                          <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums text-foreground sm:px-4 sm:py-3 sm:text-base">
+                            {cuzHesapla(t.sayfa)}
+                          </TableCell>
+                          {hocaModu && (
+                            <TableCell className="px-0.5 py-2 text-right sm:px-4 sm:py-3">
+                              <div className="flex justify-end gap-0 sm:gap-1">
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-6 w-6 sm:h-8 sm:w-8"
+                                  onClick={() => {
+                                    setDuzenleAidattan(false);
+                                    setDuzenleSayfaOdakli(true);
+                                    setDuzenlenen(t);
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                    {!yuklendi && hafizTalebeler.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5 + (hocaModu ? 1 : 0)}
+                          className="py-10 text-center text-sm text-muted-foreground"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {tr("verilerYukleniyor")}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {yuklendi && yuklemeHata && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5 + (hocaModu ? 1 : 0)}
+                          className="py-10 text-center text-sm text-destructive"
+                        >
+                          {tr("baglantiHatasi")}: {yuklemeHata}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {yuklendi && !yuklemeHata && hafizTalebeler.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5 + (hocaModu ? 1 : 0)}
+                          className="py-10 text-center text-sm text-muted-foreground"
+                        >
+                          {tr("henuzTalebeYok")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </>
+          )}
+        </div>
+
+        <VermediDiyalog
+          acik={vermediAcik}
+          onClose={() => setVermediAcik(false)}
+          gunAdi={tr("haftaGun")[seciliGun]}
+          talebeler={hafizTalebeler.filter(
+            (t) => !getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun),
+          )}
+          onTalebe={(t) => {
+            setVermediAcik(false);
+            setProfilAidattan(false);
+            setProfilGoster(t);
+          }}
+        />
+
+        <RaporDiyalog
+          acik={raporAcik}
+          onClose={() => setRaporAcik(false)}
+          talebeler={hafizTalebeler}
+          haftaBas={seciliHafta}
+          haftaEtiketi={haftaEtiket(seciliHafta)}
+          onTalebe={(t) => {
+            setRaporAcik(false);
+            setProfilAidattan(false);
+            setProfilGoster(t);
+          }}
+        />
+
+        <Dialog
+          open={girisAcik}
+          onOpenChange={(o) => {
+            setGirisAcik(o);
+            if (!o) {
+              setParolaTaslak("");
+              setParolaHata(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{tr("hocaefendiGirisi")}</DialogTitle>
+              <DialogDescription>{tr("parolaGiriniz")}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label>{tr("parola")}</Label>
+              <ParolaInput
+                value={parolaTaslak}
+                onChange={(v) => {
+                  setParolaTaslak(v.slice(0, 50));
+                  setParolaHata(null);
+                }}
+                onEnter={girisYap}
+                hata={!!parolaHata}
+                autoFocus
+              />
+              {parolaHata && <p className="text-xs text-destructive">{parolaHata}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setGirisAcik(false)}>
+                {tr("iptal")}
+              </Button>
+              <Button onClick={girisYap}>{tr("girisYap")}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={ayarlarAcik} onOpenChange={setAyarlarAcik}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{tr("ayarlar")}</DialogTitle>
+              <DialogDescription>{tr("ayarlarAciklama")}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                onClick={() => {
+                  setAyarlarAcik(false);
+                  setEskiParola("");
+                  setYeniParola("");
+                  setYeniParolaTekrar("");
+                  setParolaDegistirHata(null);
+                  setParolaDegistirAcik(true);
+                }}
+              >
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">{tr("parolaDegistir")}</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                onClick={() => {
+                  setAyarlarAcik(false);
+                  setTimeout(() => hafizlikPdf(), 150);
+                }}
+              >
+                <FileDown className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Hafızlık Listesini PDF İndir</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                onClick={() => {
+                  setAyarlarAcik(false);
+                  setTimeout(() => void aidatPdf(), 150);
+                }}
+              >
+                <FileDown className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Aidat Listesini PDF İndir</span>
+              </button>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                onClick={() => {
+                  setAyarlarAcik(false);
+                  setTimeout(() => aidatListePdf(), 150);
+                }}
+              >
+                <FileDown className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Aidat Talebe Listesi PDF İndir</span>
+              </button>
+              {hocaModu && (
+                <>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
                     onClick={() => {
-                      setHoca(hocaTaslak.trim() || "Hocaefendi");
-                      setHocaDuzenle(false);
+                      setAyarlarAcik(false);
+                      ekle(false);
                     }}
                   >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setHocaDuzenle(false)}
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">{tr("talebeEkle")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                    onClick={() => {
+                      setAyarlarAcik(false);
+                      ekle(true);
+                    }}
                   >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="text-base font-medium text-foreground">
-                    {hoca}
-                  </span>
-                  {hocaModu && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
-                      onClick={() => {
-                        setHocaTaslak(hoca);
-                        setHocaDuzenle(true);
-                      }}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  )}
+                    <Wallet className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Aidata talebe ekle</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
+                    onClick={() => {
+                      setAyarlarAcik(false);
+                      setGruplarAcik(true);
+                    }}
+                  >
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Gruplar oluştur</span>
+                  </button>
                 </>
               )}
             </div>
-
-            <div className="flex items-center gap-2">
-              {hocaModu ? (
-                <>
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                    {tr("duzenlemeModu")}
-                  </span>
-                  <Button size="sm" variant="outline" onClick={cikisYap}>
-                    <LogOut className="h-4 w-4" /> {tr("cikisYap")}
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setGirisAcik(true)}
-                >
-                  <Lock className="h-4 w-4" /> {tr("hocaefendiGirisi")}
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {sekme === "aidat" ? (
-          aidatListeAcik ? (
-            <>
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-base font-semibold text-foreground sm:text-lg">
-                Aidat Talebe Listesi
-              </h2>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => aidatListePdf()}
-                className="gap-1.5 text-xs sm:text-sm"
-              >
-                <FileDown className="h-4 w-4" /> PDF İndir
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setAyarlarAcik(false)}>
+                {tr("kapat")}
               </Button>
-            </div>
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-              <Table className="table-fixed min-w-[540px]">
-                <colgroup>
-                  <col className="w-[8%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[30%]" />
-                  <col className="w-[15%]" />
-                  <col className="w-[17%]" />
-                  <col className="w-[18%]" />
-                </colgroup>
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
-                      #
-                    </TableHead>
-                    <TableHead className="px-1 text-center text-[11px] sm:px-3 sm:text-sm">
-                      Profil
-                    </TableHead>
-                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
-                      İsim
-                    </TableHead>
-                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
-                      Sınıf
-                    </TableHead>
-                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
-                      Grup
-                    </TableHead>
-                    <TableHead className="px-1 text-[11px] sm:px-3 sm:text-sm">
-                      Telefon
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {aidatTalebeler.map((t, i) => (
-                    <TableRow key={t.id} className="hover:bg-muted/30">
-                      <TableCell className="px-1 py-2 text-center text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
-                        {i + 1}
-                      </TableCell>
-                      <TableCell className="px-1 py-2 sm:px-3 sm:py-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfilAidattan(true);
-                            setProfilGoster(t);
-                          }}
-                          className="flex w-full justify-center"
-                        >
-                          <span className="shrink-0 scale-90 sm:scale-100">
-                            <TalebeAvatar talebe={t} boyut={36} />
-                          </span>
-                        </button>
-                      </TableCell>
-                      <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-3 sm:py-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setProfilAidattan(true);
-                            setProfilGoster(t);
-                          }}
-                          className="block w-full min-w-0 truncate text-left text-[11px] hover:text-primary hover:underline sm:text-sm"
-                        >
-                          {t.isim}
-                        </button>
-                      </TableCell>
-                      <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
-                        <span className="block truncate">{t.sinif || "—"}</span>
-                      </TableCell>
-                      <TableCell className="min-w-0 px-1 py-2 text-[11px] text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
-                        <span className="block truncate">
-                          {t.grup
-                            ? (GRUPLAR.find((g) => g.id === t.grup)?.ad ?? "—")
-                            : "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="min-w-0 px-1 py-2 text-[11px] tabular-nums text-muted-foreground sm:px-3 sm:py-3 sm:text-sm">
-                        {t.telefon ? (
-                          <a
-                            href={`tel:${t.telefon.replace(/\s+/g, "")}`}
-                            className="block truncate hover:text-primary hover:underline"
-                          >
-                            {t.telefon}
-                          </a>
-                        ) : (
-                          <span className="block truncate">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {aidatTalebeler.length === 0 && (
-                    <TableRow>
-                      <TableCell
-                        colSpan={6}
-                        className="py-10 text-center text-sm text-muted-foreground"
-                      >
-                        Henüz aidat kaydı olan talebe yok.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={parolaDegistirAcik}
+          onOpenChange={(o) => {
+            setParolaDegistirAcik(o);
+            if (!o) {
+              setEskiParola("");
+              setYeniParola("");
+              setYeniParolaTekrar("");
+              setParolaDegistirHata(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{tr("parolaDegistir")}</DialogTitle>
+              <DialogDescription>{tr("yeniParolaBelirle")}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>{tr("mevcutParolaLbl")}</Label>
+                <ParolaInput
+                  value={eskiParola}
+                  onChange={(v) => {
+                    setEskiParola(v.slice(0, 50));
+                    setParolaDegistirHata(null);
+                  }}
+                />
               </div>
-            </Card>
-            </>
-          ) : (
-            <AidatPanel
-              talebeler={aidatTalebeler}
-              hocaModu={hocaModu}
-              onTalebe={(t) => {
-                setProfilAidattan(true);
-                setProfilGoster(t);
-              }}
-              grupFiltre={grupFiltre}
-            />
-          )
-        ) : (
+              <div className="space-y-1">
+                <Label>{tr("yeniParolaLbl")}</Label>
+                <ParolaInput
+                  value={yeniParola}
+                  onChange={(v) => {
+                    setYeniParola(v.slice(0, 50));
+                    setParolaDegistirHata(null);
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{tr("yeniParolaTekrarLbl")}</Label>
+                <ParolaInput
+                  value={yeniParolaTekrar}
+                  onChange={(v) => {
+                    setYeniParolaTekrar(v.slice(0, 50));
+                    setParolaDegistirHata(null);
+                  }}
+                  onEnter={parolaDegistir}
+                />
+              </div>
+              {parolaDegistirHata && (
+                <p className="text-xs text-destructive">{parolaDegistirHata}</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setParolaDegistirAcik(false)}>
+                {tr("iptal")}
+              </Button>
+              <Button onClick={parolaDegistir}>{tr("degistir")}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-        <>
-        <div className="mb-3 grid grid-cols-2 gap-3">
-          <OzetKart etiket={tr("toplamTalebe")} deger={ozet.toplam} />
-          <OzetKart
-            etiket={`${tr(seciliDers === "kuran" ? "dersKuranKisa" : seciliDers === "fikih" ? "dersFikihKisa" : "dersHadisKisa")} (${tr("haftaGun")[seciliGun]})`}
-            deger={`${ozet.kiraatSayi}/${ozet.toplam}`}
-            onClick={() => setVermediAcik(true)}
-          />
-        </div>
-
-        <div className="mb-6 flex justify-end">
-          <Button size="sm" variant="outline" onClick={() => setRaporAcik(true)}>
-            <CalendarDays className="h-4 w-4" /> {tr("haftaninRaporu")}
-          </Button>
-        </div>
-
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/30 px-3 py-2">
-          <div className="flex items-center gap-2 text-sm">
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">{haftaBasligi}</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="tabular-nums text-muted-foreground">
-              {haftaEtiket(seciliHafta)}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => setSeciliHafta((h) => h - HAFTA_MS)}
-              aria-label={tr("oncekiHafta")}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setSeciliHafta(haftaBaslangici())}
-              disabled={haftaFarki === 0}
-            >
-              {tr("buHafta")}
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => setSeciliHafta((h) => h + HAFTA_MS)}
-              aria-label={tr("sonrakiHafta")}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <Card className="overflow-hidden">
-            <Table className="table-fixed">
-              <colgroup>
-                <col className="w-[6%]" />
-                <col className={hocaModu ? "w-[44%]" : "w-[50%]"} />
-                <col className={hocaModu ? "w-[20%]" : "w-[22%]"} />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
-                {hocaModu && <col className="w-[10%]" />}
-              </colgroup>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="w-8 px-1 text-center text-xs sm:w-12 sm:px-4">#</TableHead>
-                  <TableHead className="px-1 text-xs sm:px-4 sm:text-sm">{tr("talebe")}</TableHead>
-                  <TableHead className="px-1 text-center sm:px-4">
-                    <Select
-                      value={String(seciliGun)}
-                      onValueChange={(v) => setSeciliGun(Number(v))}
-                    >
-                      <SelectTrigger className="mx-auto h-7 w-full min-w-0 px-1 text-[10px] sm:h-8 sm:w-[130px] sm:px-2 sm:text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tr("haftaGun")
-                          .map((isim, i) => ({ isim, i }))
-                          .filter(({ i }) => i < 5)
-                          .map(({ isim, i }) => (
-                            <SelectItem key={i} value={String(i)} className="text-sm">
-                              {tr("ders")} · {isim}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </TableHead>
-                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("sf")}</TableHead>
-                  <TableHead className="px-0.5 text-center text-[11px] font-semibold sm:px-4 sm:text-base">{tr("cuz")}</TableHead>
-                  {hocaModu && (
-                    <TableHead className="px-0.5 text-right text-[10px] sm:px-4 sm:text-sm">{tr("islem")}</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {hafizTalebeler.map((t, i) => {
-                  const hafta = ilerleme(t, seciliHafta, haftaSonu);
-                  return (
-                  <TableRow key={t.id} className="hover:bg-muted/30">
-                    <TableCell className="px-1 py-2 text-center text-xs text-muted-foreground sm:px-4 sm:py-3 sm:text-sm">
-                      {i + 1}
-                    </TableCell>
-                    <TableCell className="min-w-0 px-1 py-2 font-medium sm:px-4 sm:py-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setProfilAidattan(false);
-                          setProfilGoster(t);
+        <Dialog open={gruplarAcik} onOpenChange={setGruplarAcik}>
+          <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Gruplar oluştur</DialogTitle>
+              <DialogDescription>Talebeleri gruplara atayın.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              {talebeler
+                .filter((t) => !t.aidatHaric)
+                .map((t) => (
+                  <div key={t.id} className="rounded-md border border-border/60 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm font-medium">{t.isim}</span>
+                      <select
+                        value={t.grup ?? ""}
+                        onChange={(e) => {
+                          const yeni = e.target.value as Grup | "";
+                          void talebeGuncelle(t.id, {
+                            grup: yeni === "" ? undefined : yeni,
+                          });
                         }}
-                        className="group flex w-full min-w-0 items-center gap-1 text-left text-xs hover:text-primary sm:gap-2 sm:text-sm"
+                        className="h-9 shrink-0 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
                       >
-                        <span className="shrink-0 scale-90 sm:scale-100">
-                          <TalebeAvatar talebe={t} boyut={38} />
-                        </span>
-                        <span className="min-w-0 truncate group-hover:underline">{t.isim}</span>
-                      </button>
-                    </TableCell>
-                    <TableCell className="px-0.5 py-2 text-center sm:px-4 sm:py-3">
-                      <GunDurum
-                        verdi={getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun)}
-                        duzenlenebilir={hocaModu}
-                        onToggle={() => dersGunToggle(t, seciliDers, seciliGun)}
-                      />
-                    </TableCell>
-                    <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums sm:px-4 sm:py-3 sm:text-base">
-                      <SayfaEditor
-                        talebe={t}
-                        duzenlenebilir={false}
-                        onKaydet={(yeni) => guncelle(t.id, { sayfa: yeni })}
-                      />
-                    </TableCell>
-                    <TableCell className="px-0.5 py-2 text-center text-[11px] font-medium tabular-nums text-foreground sm:px-4 sm:py-3 sm:text-base">
-                      {cuzHesapla(t.sayfa)}
-                    </TableCell>
-                    {hocaModu && (
-                      <TableCell className="px-0.5 py-2 text-right sm:px-4 sm:py-3">
-                        <div className="flex justify-end gap-0 sm:gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 sm:h-8 sm:w-8"
-                            onClick={() => {
-                              setDuzenleAidattan(false);
-                              setDuzenleSayfaOdakli(true);
-                              setDuzenlenen(t);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                  );
-                })}
-                {!yuklendi && hafizTalebeler.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5 + (hocaModu ? 1 : 0)}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {tr("verilerYukleniyor")}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {yuklendi && yuklemeHata && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5 + (hocaModu ? 1 : 0)}
-                      className="py-10 text-center text-sm text-destructive"
-                    >
-                      {tr("baglantiHatasi")}: {yuklemeHata}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {yuklendi && !yuklemeHata && hafizTalebeler.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5 + (hocaModu ? 1 : 0)}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      {tr("henuzTalebeYok")}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-        </Card>
-        </>
-        )}
-      </div>
-
-      <VermediDiyalog
-        acik={vermediAcik}
-        onClose={() => setVermediAcik(false)}
-        gunAdi={tr("haftaGun")[seciliGun]}
-        talebeler={hafizTalebeler.filter(
-          (t) => !getDersGunler(t, seciliDers, seciliHafta).includes(seciliGun),
-        )}
-        onTalebe={(t) => {
-          setVermediAcik(false);
-          setProfilAidattan(false);
-          setProfilGoster(t);
-        }}
-      />
-
-      <RaporDiyalog
-        acik={raporAcik}
-        onClose={() => setRaporAcik(false)}
-        talebeler={hafizTalebeler}
-        haftaBas={seciliHafta}
-        haftaEtiketi={haftaEtiket(seciliHafta)}
-        onTalebe={(t) => {
-          setRaporAcik(false);
-          setProfilAidattan(false);
-          setProfilGoster(t);
-        }}
-      />
-
-
-      <Dialog
-        open={girisAcik}
-        onOpenChange={(o) => {
-          setGirisAcik(o);
-          if (!o) {
-            setParolaTaslak("");
-            setParolaHata(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{tr("hocaefendiGirisi")}</DialogTitle>
-            <DialogDescription>
-              {tr("parolaGiriniz")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>{tr("parola")}</Label>
-            <ParolaInput
-              value={parolaTaslak}
-              onChange={(v) => {
-                setParolaTaslak(v.slice(0, 50));
-                setParolaHata(null);
-              }}
-              onEnter={girisYap}
-              hata={!!parolaHata}
-              autoFocus
-            />
-            {parolaHata && (
-              <p className="text-xs text-destructive">{parolaHata}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setGirisAcik(false)}>
-              {tr("iptal")}
-            </Button>
-            <Button onClick={girisYap}>{tr("girisYap")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={ayarlarAcik} onOpenChange={setAyarlarAcik}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{tr("ayarlar")}</DialogTitle>
-            <DialogDescription>{tr("ayarlarAciklama")}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-              onClick={() => {
-                setAyarlarAcik(false);
-                setEskiParola("");
-                setYeniParola("");
-                setYeniParolaTekrar("");
-                setParolaDegistirHata(null);
-                setParolaDegistirAcik(true);
-              }}
-            >
-              <Lock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{tr("parolaDegistir")}</span>
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-              onClick={() => {
-                setAyarlarAcik(false);
-                setTimeout(() => hafizlikPdf(), 150);
-              }}
-            >
-              <FileDown className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Hafızlık Listesini PDF İndir
-              </span>
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-              onClick={() => {
-                setAyarlarAcik(false);
-                setTimeout(() => void aidatPdf(), 150);
-              }}
-            >
-              <FileDown className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Aidat Listesini PDF İndir
-              </span>
-            </button>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-              onClick={() => {
-                setAyarlarAcik(false);
-                setTimeout(() => aidatListePdf(), 150);
-              }}
-            >
-              <FileDown className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">
-                Aidat Talebe Listesi PDF İndir
-              </span>
-            </button>
-            {hocaModu && (
-              <>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-                  onClick={() => {
-                    setAyarlarAcik(false);
-                    ekle(false);
-                  }}
-                >
-                  <Plus className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">{tr("talebeEkle")}</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-                  onClick={() => {
-                    setAyarlarAcik(false);
-                    ekle(true);
-                  }}
-                >
-                  <Wallet className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Aidata talebe ekle</span>
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-md border border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent"
-                  onClick={() => {
-                    setAyarlarAcik(false);
-                    setGruplarAcik(true);
-                  }}
-                >
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Gruplar oluştur</span>
-                </button>
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setAyarlarAcik(false)}>
-              {tr("kapat")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={parolaDegistirAcik}
-        onOpenChange={(o) => {
-          setParolaDegistirAcik(o);
-          if (!o) {
-            setEskiParola("");
-            setYeniParola("");
-            setYeniParolaTekrar("");
-            setParolaDegistirHata(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{tr("parolaDegistir")}</DialogTitle>
-            <DialogDescription>
-              {tr("yeniParolaBelirle")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>{tr("mevcutParolaLbl")}</Label>
-              <ParolaInput
-                value={eskiParola}
-                onChange={(v) => {
-                  setEskiParola(v.slice(0, 50));
-                  setParolaDegistirHata(null);
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{tr("yeniParolaLbl")}</Label>
-              <ParolaInput
-                value={yeniParola}
-                onChange={(v) => {
-                  setYeniParola(v.slice(0, 50));
-                  setParolaDegistirHata(null);
-                }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{tr("yeniParolaTekrarLbl")}</Label>
-              <ParolaInput
-                value={yeniParolaTekrar}
-                onChange={(v) => {
-                  setYeniParolaTekrar(v.slice(0, 50));
-                  setParolaDegistirHata(null);
-                }}
-                onEnter={parolaDegistir}
-              />
-            </div>
-            {parolaDegistirHata && (
-              <p className="text-xs text-destructive">{parolaDegistirHata}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setParolaDegistirAcik(false)}>
-              {tr("iptal")}
-            </Button>
-            <Button onClick={parolaDegistir}>{tr("degistir")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={gruplarAcik} onOpenChange={setGruplarAcik}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Gruplar oluştur</DialogTitle>
-            <DialogDescription>Talebeleri gruplara atayın.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {talebeler
-              .filter((t) => !t.aidatHaric)
-              .map((t) => (
-                <div
-                  key={t.id}
-                  className="rounded-md border border-border/60 px-3 py-2"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate text-sm font-medium">{t.isim}</span>
-                    <select
-                      value={t.grup ?? ""}
-                      onChange={(e) => {
-                        const yeni = e.target.value as Grup | "";
-                        void talebeGuncelle(t.id, {
-                          grup: yeni === "" ? undefined : yeni,
-                        });
-                      }}
-                      className="h-9 shrink-0 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary"
-                    >
-                      <option value="">Grup yok</option>
-                      {GRUPLAR.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.ad}
-                        </option>
-                      ))}
-                    </select>
+                        <option value="">Grup yok</option>
+                        {GRUPLAR.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.ad}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
-              ))}
-            {talebeler.filter((t) => !t.aidatHaric).length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Henüz talebe yok.
-              </p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setGruplarAcik(false)}>Kapat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                ))}
+              {talebeler.filter((t) => !t.aidatHaric).length === 0 && (
+                <p className="py-6 text-center text-sm text-muted-foreground">Henüz talebe yok.</p>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setGruplarAcik(false)}>Kapat</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
+        <DuzenleDiyalog
+          talebe={duzenlenen}
+          kiraatGizli={duzenleAidattan}
+          sayfaOdakli={duzenleSayfaOdakli}
+          onClose={() => {
+            setDuzenlenen(null);
+            setDuzenleSayfaOdakli(false);
+          }}
+          onKaydet={(p) => {
+            if (duzenlenen) guncelle(duzenlenen.id, p);
+            setDuzenlenen(null);
+            setDuzenleSayfaOdakli(false);
+          }}
+        />
 
-      <DuzenleDiyalog
-        talebe={duzenlenen}
-        kiraatGizli={duzenleAidattan}
-        sayfaOdakli={duzenleSayfaOdakli}
-        onClose={() => {
-          setDuzenlenen(null);
-          setDuzenleSayfaOdakli(false);
-        }}
-        onKaydet={(p) => {
-          if (duzenlenen) guncelle(duzenlenen.id, p);
-          setDuzenlenen(null);
-          setDuzenleSayfaOdakli(false);
-        }}
-      />
-
-      <ProfilDiyalog
-        talebe={
-          profilGoster
-            ? (talebeler.find((x) => x.id === profilGoster.id) ?? profilGoster)
-            : null
-        }
-        hocaModu={hocaModu}
-        kiraatGizli={profilAidattan}
-        onClose={() => setProfilGoster(null)}
-        onDuzenle={(t) => {
-          setProfilGoster(null);
-          setDuzenleAidattan(profilAidattan);
-          setDuzenlenen(t);
-        }}
-        onFotoDegistir={(t, fotoUrl) => {
-          void talebeGuncelle(t.id, { fotoUrl });
-        }}
-        onNotKaydet={(t, patch) => {
-          void talebeGuncelle(t.id, patch);
-        }}
-        onSil={() => {
-          const id = profilGoster?.id;
-          setProfilGoster(null);
-          if (id) sil(id);
-        }}
-      />
-    </div>
+        <ProfilDiyalog
+          talebe={
+            profilGoster ? (talebeler.find((x) => x.id === profilGoster.id) ?? profilGoster) : null
+          }
+          hocaModu={hocaModu}
+          kiraatGizli={profilAidattan}
+          onClose={() => setProfilGoster(null)}
+          onDuzenle={(t) => {
+            setProfilGoster(null);
+            setDuzenleAidattan(profilAidattan);
+            setDuzenlenen(t);
+          }}
+          onFotoDegistir={(t, fotoUrl) => {
+            void talebeGuncelle(t.id, { fotoUrl });
+          }}
+          onNotKaydet={(t, patch) => {
+            void talebeGuncelle(t.id, patch);
+          }}
+          onSil={() => {
+            const id = profilGoster?.id;
+            setProfilGoster(null);
+            if (id) sil(id);
+          }}
+        />
+      </div>
     </DilContext.Provider>
   );
 }
 
-function TalebeAvatar({
-  talebe,
-  boyut = 40,
-}: {
-  talebe: Talebe;
-  boyut?: number;
-}) {
+function TalebeAvatar({ talebe, boyut = 40 }: { talebe: Talebe; boyut?: number }) {
   const stil = {
     width: boyut,
     height: boyut,
@@ -1648,263 +1597,266 @@ function ProfilDiyalog({
     <>
       <Dialog open={!!talebe} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="fixed flex max-h-[94dvh] w-[95vw] max-w-[95vw] flex-col overflow-hidden p-0 sm:max-w-md">
-        {hocaModu && (
-          <Button
-            size="icon"
-            variant="destructive"
-            className="absolute left-2 top-2 z-10"
-            title={t("sil")}
-            onClick={() => setSilOnayAcik(true)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        )}
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:p-6">
-          <DialogHeader className="text-center">
-            <DialogTitle>{t("talebeProfili")}</DialogTitle>
-            <DialogDescription className="sr-only">{t("fotoVeKisisel")}</DialogDescription>
-          </DialogHeader>
-
-        <div className="flex flex-col items-center gap-2">
-          <div className="relative h-[92px] w-[92px] sm:h-[120px] sm:w-[120px]">
-            <button
-              type="button"
-              onClick={() => talebe.fotoUrl && setFotoBuyuk(true)}
-              className={`block rounded-full ${talebe.fotoUrl ? "cursor-zoom-in" : "cursor-default"}`}
-              title={talebe.fotoUrl ? t("fotoBuyut") : undefined}
-            >
-              <span className="sm:hidden"><TalebeAvatar talebe={talebe} boyut={92} /></span>
-              <span className="hidden sm:block"><TalebeAvatar talebe={talebe} boyut={120} /></span>
-            </button>
-            {hocaModu && (
-              <label
-                className="absolute -bottom-1 -right-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow ring-2 ring-background hover:opacity-90"
-                title={t("fotoYukle")}
-              >
-                {yukleniyor ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    void fotoSec(e.target.files?.[0]);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
-          </div>
-          <div className="text-center">
-            {isimDuzenle && hocaModu ? (
-              <div className="flex items-center justify-center gap-1.5">
-                <Input
-                  value={isimTaslak}
-                  onChange={(e) => setIsimTaslak(e.target.value.slice(0, 60))}
-                  className="h-9 w-48 text-center text-base font-semibold"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      const yeni = isimTaslak.trim();
-                      if (yeni && yeni !== talebe.isim) {
-                        onNotKaydet(talebe, { isim: yeni });
-                      }
-                      setIsimDuzenle(false);
-                    }
-                    if (e.key === "Escape") {
-                      setIsimTaslak(talebe.isim);
-                      setIsimDuzenle(false);
-                    }
-                  }}
-                />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-primary"
-                  disabled={!isimTaslak.trim()}
-                  onClick={() => {
-                    const yeni = isimTaslak.trim();
-                    if (yeni && yeni !== talebe.isim) {
-                      onNotKaydet(talebe, { isim: yeni });
-                    }
-                    setIsimDuzenle(false);
-                  }}
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 text-muted-foreground"
-                  onClick={() => {
-                    setIsimTaslak(talebe.isim);
-                    setIsimDuzenle(false);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-1.5">
-                <div className="text-lg font-semibold">{talebe.isim}</div>
-                {hocaModu && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                    title={t("duzenle")}
-                    onClick={() => {
-                      setIsimTaslak(talebe.isim);
-                      setIsimDuzenle(true);
-                    }}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            )}
-            <div className="min-h-4 text-xs text-muted-foreground">
-              {!kiraatGizli && (
-                <>
-                  {t("sayfa")} {talebe.sayfa} · {cuzHesapla(talebe.sayfa)}
-                  {t("cuzTam")}
-                </>
-              )}
-            </div>
-          </div>
-          {hocaModu && talebe.fotoUrl && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="-my-1 text-xs text-muted-foreground"
-              onClick={() => onFotoDegistir(talebe, "")}
-            >
-              {t("fotoKaldir")}
-            </Button>
-          )}
-          {hata && <p className="text-xs text-destructive">{hata}</p>}
-        </div>
-
-
-        <div className="mt-1 space-y-2">
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-sm">
-              Sınıf
-            </Label>
-            <Input
-              value={sinif}
-              onChange={(e) => setSinif(e.target.value.slice(0, 40))}
-              disabled={!hocaModu}
-              placeholder="—"
-              className="text-base"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-sm">
-              <Phone className="h-3.5 w-3.5" /> {t("telefon")}
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                value={telefon}
-                onChange={(e) => setTelefon(e.target.value.slice(0, 30))}
-                disabled={!hocaModu}
-                placeholder="—"
-                inputMode="tel"
-                type="tel"
-                className="text-base"
-              />
-              {telefon.trim() && (
-                <Button asChild size="icon" variant="outline" title={t("ara")}>
-                  <a href={`tel:${telefon.replace(/\s+/g, "")}`}>
-                    <Phone className="h-4 w-4" />
-                  </a>
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="flex items-center gap-1.5 text-sm">
-              <StickyNote className="h-3.5 w-3.5" /> {t("notlar")}
-            </Label>
-            <Textarea
-              value={notlar}
-              onChange={(e) => setNotlar(e.target.value.slice(0, 600))}
-              disabled={!hocaModu}
-              rows={2}
-              placeholder="—"
-              className="text-base sm:min-h-[84px]"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t bg-background px-4 py-3 sm:p-6">
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" onClick={onClose}>
-            {t("iptal")}
-          </Button>
           {hocaModu && (
             <Button
-              onClick={() => {
-                onNotKaydet(talebe, {
-                  telefon: telefon.trim(),
-                  sinif: sinif.trim(),
-                  notlar: notlar.trim(),
-                });
-                onClose();
-              }}
+              size="icon"
+              variant="destructive"
+              className="absolute left-2 top-2 z-10"
+              title={t("sil")}
+              onClick={() => setSilOnayAcik(true)}
             >
-              {t("kaydet")}
+              <Trash2 className="h-4 w-4" />
             </Button>
           )}
-        </DialogFooter>
-      </div>
-    </DialogContent>
-
-      {talebe.fotoUrl && (
-        <Dialog open={fotoBuyuk} onOpenChange={(o) => !o && setFotoBuyuk(false)}>
-          <DialogContent className="max-w-[95vw] border-0 bg-transparent p-0 shadow-none sm:max-w-[90vw]">
-            <DialogHeader className="sr-only">
-              <DialogTitle>{talebe.isim} {t("fotoBaslik")}</DialogTitle>
-              <DialogDescription>{t("fotoBuyutGorunum")}</DialogDescription>
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:p-6">
+            <DialogHeader className="text-center">
+              <DialogTitle>{t("talebeProfili")}</DialogTitle>
+              <DialogDescription className="sr-only">{t("fotoVeKisisel")}</DialogDescription>
             </DialogHeader>
-            <img
-              src={talebe.fotoUrl}
-              alt={talebe.isim}
-              className="mx-auto max-h-[85vh] w-auto max-w-full rounded-lg object-contain"
-            />
-          </DialogContent>
-        </Dialog>
-      )}
-    </Dialog>
 
-    <AlertDialog open={silOnayAcik} onOpenChange={setSilOnayAcik}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("eminMisiniz")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("silmeOnay")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setSilOnayAcik(false)}>
-            {t("iptal")}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            onClick={() => {
-              onSil();
-              onClose();
-              setSilOnayAcik(false);
-            }}
-          >
-            {t("evetSil")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  </>
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative h-[92px] w-[92px] sm:h-[120px] sm:w-[120px]">
+                <button
+                  type="button"
+                  onClick={() => talebe.fotoUrl && setFotoBuyuk(true)}
+                  className={`block rounded-full ${talebe.fotoUrl ? "cursor-zoom-in" : "cursor-default"}`}
+                  title={talebe.fotoUrl ? t("fotoBuyut") : undefined}
+                >
+                  <span className="sm:hidden">
+                    <TalebeAvatar talebe={talebe} boyut={92} />
+                  </span>
+                  <span className="hidden sm:block">
+                    <TalebeAvatar talebe={talebe} boyut={120} />
+                  </span>
+                </button>
+                {hocaModu && (
+                  <label
+                    className="absolute -bottom-1 -right-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow ring-2 ring-background hover:opacity-90"
+                    title={t("fotoYukle")}
+                  >
+                    {yukleniyor ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        void fotoSec(e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="text-center">
+                {isimDuzenle && hocaModu ? (
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Input
+                      value={isimTaslak}
+                      onChange={(e) => setIsimTaslak(e.target.value.slice(0, 60))}
+                      className="h-9 w-48 text-center text-base font-semibold"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const yeni = isimTaslak.trim();
+                          if (yeni && yeni !== talebe.isim) {
+                            onNotKaydet(talebe, { isim: yeni });
+                          }
+                          setIsimDuzenle(false);
+                        }
+                        if (e.key === "Escape") {
+                          setIsimTaslak(talebe.isim);
+                          setIsimDuzenle(false);
+                        }
+                      }}
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-primary"
+                      disabled={!isimTaslak.trim()}
+                      onClick={() => {
+                        const yeni = isimTaslak.trim();
+                        if (yeni && yeni !== talebe.isim) {
+                          onNotKaydet(talebe, { isim: yeni });
+                        }
+                        setIsimDuzenle(false);
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground"
+                      onClick={() => {
+                        setIsimTaslak(talebe.isim);
+                        setIsimDuzenle(false);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-1.5">
+                    <div className="text-lg font-semibold">{talebe.isim}</div>
+                    {hocaModu && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        title={t("duzenle")}
+                        onClick={() => {
+                          setIsimTaslak(talebe.isim);
+                          setIsimDuzenle(true);
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <div className="min-h-4 text-xs text-muted-foreground">
+                  {!kiraatGizli && (
+                    <>
+                      {t("sayfa")} {talebe.sayfa} · {cuzHesapla(talebe.sayfa)}
+                      {t("cuzTam")}
+                    </>
+                  )}
+                </div>
+              </div>
+              {hocaModu && talebe.fotoUrl && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="-my-1 text-xs text-muted-foreground"
+                  onClick={() => onFotoDegistir(talebe, "")}
+                >
+                  {t("fotoKaldir")}
+                </Button>
+              )}
+              {hata && <p className="text-xs text-destructive">{hata}</p>}
+            </div>
+
+            <div className="mt-1 space-y-2">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-sm">Sınıf</Label>
+                <Input
+                  value={sinif}
+                  onChange={(e) => setSinif(e.target.value.slice(0, 40))}
+                  disabled={!hocaModu}
+                  placeholder="—"
+                  className="text-base"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-sm">
+                  <Phone className="h-3.5 w-3.5" /> {t("telefon")}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={telefon}
+                    onChange={(e) => setTelefon(e.target.value.slice(0, 30))}
+                    disabled={!hocaModu}
+                    placeholder="—"
+                    inputMode="tel"
+                    type="tel"
+                    className="text-base"
+                  />
+                  {telefon.trim() && (
+                    <Button asChild size="icon" variant="outline" title={t("ara")}>
+                      <a href={`tel:${telefon.replace(/\s+/g, "")}`}>
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-sm">
+                  <StickyNote className="h-3.5 w-3.5" /> {t("notlar")}
+                </Label>
+                <Textarea
+                  value={notlar}
+                  onChange={(e) => setNotlar(e.target.value.slice(0, 600))}
+                  disabled={!hocaModu}
+                  rows={2}
+                  placeholder="—"
+                  className="text-base sm:min-h-[84px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t bg-background px-4 py-3 sm:p-6">
+            <DialogFooter className="gap-2 sm:gap-2">
+              <Button variant="outline" onClick={onClose}>
+                {t("iptal")}
+              </Button>
+              {hocaModu && (
+                <Button
+                  onClick={() => {
+                    onNotKaydet(talebe, {
+                      telefon: telefon.trim(),
+                      sinif: sinif.trim(),
+                      notlar: notlar.trim(),
+                    });
+                    onClose();
+                  }}
+                >
+                  {t("kaydet")}
+                </Button>
+              )}
+            </DialogFooter>
+          </div>
+        </DialogContent>
+
+        {talebe.fotoUrl && (
+          <Dialog open={fotoBuyuk} onOpenChange={(o) => !o && setFotoBuyuk(false)}>
+            <DialogContent className="max-w-[95vw] border-0 bg-transparent p-0 shadow-none sm:max-w-[90vw]">
+              <DialogHeader className="sr-only">
+                <DialogTitle>
+                  {talebe.isim} {t("fotoBaslik")}
+                </DialogTitle>
+                <DialogDescription>{t("fotoBuyutGorunum")}</DialogDescription>
+              </DialogHeader>
+              <img
+                src={talebe.fotoUrl}
+                alt={talebe.isim}
+                className="mx-auto max-h-[85vh] w-auto max-w-full rounded-lg object-contain"
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+      </Dialog>
+
+      <AlertDialog open={silOnayAcik} onOpenChange={setSilOnayAcik}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("eminMisiniz")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("silmeOnay")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSilOnayAcik(false)}>
+              {t("iptal")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                onSil();
+                onClose();
+                setSilOnayAcik(false);
+              }}
+            >
+              {t("evetSil")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
@@ -1919,12 +1871,8 @@ function OzetKart({
 }) {
   const icerik = (
     <CardContent className="px-3 py-3 text-center sm:px-4 sm:py-4">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">
-        {etiket}
-      </div>
-      <div className="mt-1 text-xl font-semibold text-foreground sm:text-2xl">
-        {deger}
-      </div>
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">{etiket}</div>
+      <div className="mt-1 text-xl font-semibold text-foreground sm:text-2xl">{deger}</div>
     </CardContent>
   );
   if (onClick) {
@@ -2026,9 +1974,7 @@ function IlerlemeRozet({ sayfa }: { sayfa: number }) {
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
-        sayfa > 0
-          ? "bg-primary/10 text-primary"
-          : "bg-muted text-muted-foreground"
+        sayfa > 0 ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
       }`}
     >
       {sayfa} sf
@@ -2124,9 +2070,7 @@ function DuzenleDiyalog({
       >
         <DialogHeader>
           <DialogTitle>{t("talebeyiDuzenle")}</DialogTitle>
-          <DialogDescription>
-            {t("isimDersIlerleme")}
-          </DialogDescription>
+          <DialogDescription>{t("isimDersIlerleme")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -2140,86 +2084,78 @@ function DuzenleDiyalog({
           </div>
 
           {!kiraatGizli && (
-          <div className="space-y-1.5">
-            <Label>{t("kiraatYonu")}</Label>
-            <Select
-              value={yon}
-              onValueChange={(v) => {
-                const yeniYon = v as KiraatYonu;
-                setYon(yeniYon);
-                // Yön değişince sayfa varsayılanını mantıklı uca getir
-                const mevcutSayfa = Number(sayfaTaslak);
-                if (yeniYon === "ustten" && (mevcutSayfa === 1 || !Number.isFinite(mevcutSayfa))) {
-                  setSayfaTaslak("604");
-                  setSayfaHata(null);
-                } else if (yeniYon === "alttan" && mevcutSayfa === 604) {
-                  setSayfaTaslak("1");
-                  setSayfaHata(null);
-                }
-              }}
-            >
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="alttan">{t("alttan")}</SelectItem>
-                <SelectItem value="ustten">{t("ustten")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          )}
-
-          {!kiraatGizli && (
-          <p className="text-xs text-muted-foreground">
-            {t("kiraatGunIpucu")}
-          </p>
-          )}
-
-          {!kiraatGizli && (
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5">
-                <BookOpen className="h-3.5 w-3.5" /> {t("sayfaAralik")}
-              </Label>
-              <Input
-                ref={sayfaInputRef}
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={604}
-                value={sayfaTaslak}
-                onChange={(e) => {
-                  setSayfaTaslak(e.target.value);
-                  sayfaDogrula(e.target.value);
+              <Label>{t("kiraatYonu")}</Label>
+              <Select
+                value={yon}
+                onValueChange={(v) => {
+                  const yeniYon = v as KiraatYonu;
+                  setYon(yeniYon);
+                  // Yön değişince sayfa varsayılanını mantıklı uca getir
+                  const mevcutSayfa = Number(sayfaTaslak);
+                  if (
+                    yeniYon === "ustten" &&
+                    (mevcutSayfa === 1 || !Number.isFinite(mevcutSayfa))
+                  ) {
+                    setSayfaTaslak("604");
+                    setSayfaHata(null);
+                  } else if (yeniYon === "alttan" && mevcutSayfa === 604) {
+                    setSayfaTaslak("1");
+                    setSayfaHata(null);
+                  }
                 }}
-                aria-invalid={sayfaHata ? true : undefined}
-                className={
-                  sayfaHata
-                    ? "border-destructive focus-visible:ring-destructive"
-                    : ""
-                }
-              />
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alttan">{t("alttan")}</SelectItem>
+                  <SelectItem value="ustten">{t("ustten")}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>{t("cuzOtomatik")}</Label>
-              <div className="flex h-9 items-center rounded-md border border-input bg-secondary/40 px-3 text-sm font-medium text-secondary-foreground">
-                {cuz}{typeof cuz === "number" ? t("cuzTam") : ""}
+          )}
+
+          {!kiraatGizli && <p className="text-xs text-muted-foreground">{t("kiraatGunIpucu")}</p>}
+
+          {!kiraatGizli && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5">
+                  <BookOpen className="h-3.5 w-3.5" /> {t("sayfaAralik")}
+                </Label>
+                <Input
+                  ref={sayfaInputRef}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={604}
+                  value={sayfaTaslak}
+                  onChange={(e) => {
+                    setSayfaTaslak(e.target.value);
+                    sayfaDogrula(e.target.value);
+                  }}
+                  aria-invalid={sayfaHata ? true : undefined}
+                  className={sayfaHata ? "border-destructive focus-visible:ring-destructive" : ""}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("cuzOtomatik")}</Label>
+                <div className="flex h-9 items-center rounded-md border border-input bg-secondary/40 px-3 text-sm font-medium text-secondary-foreground">
+                  {cuz}
+                  {typeof cuz === "number" ? t("cuzTam") : ""}
+                </div>
               </div>
             </div>
-          </div>
           )}
           {sayfaHata && !kiraatGizli && <p className="text-xs text-destructive">{sayfaHata}</p>}
-
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t("iptal")}
           </Button>
-          <Button
-            onClick={kaydet}
-            disabled={!!sayfaHata || !isim.trim()}
-          >
+          <Button onClick={kaydet} disabled={!!sayfaHata || !isim.trim()}>
             {t("kaydet")}
           </Button>
         </DialogFooter>
@@ -2240,22 +2176,15 @@ function DersKutu({
   return (
     <label
       className={`flex cursor-pointer items-center justify-between rounded-md border px-3 py-2.5 transition-colors ${
-        verildi
-          ? "border-primary/40 bg-primary/5"
-          : "border-border bg-card hover:bg-muted/50"
+        verildi ? "border-primary/40 bg-primary/5" : "border-border bg-card hover:bg-muted/50"
       }`}
     >
       <span className="text-sm font-medium text-foreground">{etiket}</span>
       <div className="flex items-center gap-2">
-        <span
-          className={`text-xs ${verildi ? "text-primary" : "text-muted-foreground"}`}
-        >
+        <span className={`text-xs ${verildi ? "text-primary" : "text-muted-foreground"}`}>
           {verildi ? "Verdi" : "Vermedi"}
         </span>
-        <Checkbox
-          checked={verildi}
-          onCheckedChange={(v) => onChange(Boolean(v))}
-        />
+        <Checkbox checked={verildi} onCheckedChange={(v) => onChange(Boolean(v))} />
       </div>
     </label>
   );
@@ -2301,7 +2230,6 @@ function ParolaInput({
   );
 }
 
-
 function VermediDiyalog({
   acik,
   onClose,
@@ -2320,16 +2248,16 @@ function VermediDiyalog({
     <Dialog open={acik} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{tr("dersVermeyenler")} · {gunAdi}</DialogTitle>
+          <DialogTitle>
+            {tr("dersVermeyenler")} · {gunAdi}
+          </DialogTitle>
           <DialogDescription>
             {talebeler.length} {tr("talebeIsaretliDegil")}
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto">
           {talebeler.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              {tr("hepsiVerdi")}
-            </p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{tr("hepsiVerdi")}</p>
           ) : (
             <ul className="divide-y divide-border">
               {talebeler.map((t) => (
@@ -2343,7 +2271,8 @@ function VermediDiyalog({
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">{t.isim}</div>
                       <div className="text-xs text-muted-foreground">
-                        {tr("sayfa")} {t.sayfa} · {cuzHesapla(t.sayfa)}{tr("cuzTam")}
+                        {tr("sayfa")} {t.sayfa} · {cuzHesapla(t.sayfa)}
+                        {tr("cuzTam")}
                       </div>
                     </div>
                     <span className="rounded-md border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-semibold text-destructive">
@@ -2356,7 +2285,9 @@ function VermediDiyalog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>{tr("kapat")}</Button>
+          <Button variant="ghost" onClick={onClose}>
+            {tr("kapat")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2386,11 +2317,7 @@ function RaporDiyalog({
   const ortalar = siralanmis.filter((x) => x.gun === 2 || x.gun === 3);
   const zayiflar = siralanmis.filter((x) => x.gun <= 1);
 
-  const grup = (
-    baslik: string,
-    renk: string,
-    liste: { t: Talebe; gun: number }[],
-  ) => (
+  const grup = (baslik: string, renk: string, liste: { t: Talebe; gun: number }[]) => (
     <div>
       <h3 className={`mb-2 text-sm font-semibold ${renk}`}>
         {baslik} <span className="text-muted-foreground">({liste.length})</span>
@@ -2407,11 +2334,10 @@ function RaporDiyalog({
                 className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40"
               >
                 <TalebeAvatar talebe={t} boyut={32} />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {t.isim}
-                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.isim}</span>
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
-                  {gun}{tr("gun7")}
+                  {gun}
+                  {tr("gun7")}
                 </span>
               </button>
             </li>
@@ -2434,7 +2360,9 @@ function RaporDiyalog({
           {grup(tr("zayiflar"), "text-destructive", zayiflar)}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>{tr("kapat")}</Button>
+          <Button variant="ghost" onClick={onClose}>
+            {tr("kapat")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2481,9 +2409,7 @@ function SayfaEditor({
           <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
             {talebe.isim}
           </div>
-          <div className="mt-0.5 text-2xl font-semibold tabular-nums text-foreground">
-            {taslak}
-          </div>
+          <div className="mt-0.5 text-2xl font-semibold tabular-nums text-foreground">{taslak}</div>
           <div className="text-[11px] text-muted-foreground">
             {cuzHesapla(taslak)}
             {tr("cuzTam")}
@@ -2512,22 +2438,13 @@ function SayfaEditor({
   );
 }
 
-function SayfaCarki({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-}) {
+function SayfaCarki({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const ITEM_H = 40;
   const VISIBLE = 7; // odd: center + 3 on each side
   const PAD = Math.floor(VISIBLE / 2);
   const MIN = 1;
   const MAX = 604;
-  const sayilar = useMemo(
-    () => Array.from({ length: MAX - MIN + 1 }, (_, i) => MIN + i),
-    [],
-  );
+  const sayilar = useMemo(() => Array.from({ length: MAX - MIN + 1 }, (_, i) => MIN + i), []);
   const ref = useRef<HTMLDivElement | null>(null);
   const programatik = useRef(false);
   const zaman = useRef<number | null>(null);
@@ -2658,10 +2575,7 @@ function SayiEditor({
   return (
     <Popover open={acik} onOpenChange={setAcik}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="rounded-md px-2 py-1 font-medium hover:bg-muted/60"
-        >
+        <button type="button" className="rounded-md px-2 py-1 font-medium hover:bg-muted/60">
           {deger}
           {ekKisa ? <span className="text-muted-foreground">{ekKisa}</span> : null}
         </button>
@@ -2685,9 +2599,7 @@ function SayiEditor({
             <Check className="h-4 w-4" />
           </Button>
         </div>
-        <p className="mt-1 text-center text-[11px] text-muted-foreground">
-          1 - {max}
-        </p>
+        <p className="mt-1 text-center text-[11px] text-muted-foreground">1 - {max}</p>
       </PopoverContent>
     </Popover>
   );

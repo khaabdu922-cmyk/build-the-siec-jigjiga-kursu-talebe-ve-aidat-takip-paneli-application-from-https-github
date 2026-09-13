@@ -3,6 +3,7 @@
 Build the 'SİEC JİGJİGA KURSU - Talebe ve Aidat Takip Paneli' application from https://github.com/miyonerzihniyeti99-design/journey-together-16.git:
 
 Key features to include:
+
 1. Header: 'SİEC JİGJİGA KURSU' with section tabs for 'Hafızlık takip paneli' and 'Aidat takip paneli'. Groups menu (1. Seviye, 2. Seviye, Hazırlık) and Hocaefendi management.
 2. Hocaefendi authentication & session mode (password protected) to toggle edit mode, change password, and edit teacher name.
 3. Hafızlık Takip Paneli:
@@ -16,7 +17,7 @@ Key features to include:
    - Filter by group (1. Seviye, 2. Seviye, Hazırlık).
    - Payment status checkboxes per student per month with total collection summaries.
 5. Management modal: Add student, add student to aidat only, assign students to groups.
-Modern clean UI styled with Tailwind CSS, Lucide icons, and responsive desktop/mobile design.
+   Modern clean UI styled with Tailwind CSS, Lucide icons, and responsive desktop/mobile design.
 
 This project was built with [Lovable](https://lovable.dev).
 
